@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CampusMarket</title>
+<title>Skoop</title>
 <link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,600&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -21,7 +21,7 @@
   <div class="nav-inner">
     <a class="logo" href="#">
       <div class="logo-mark"><span class="material-icons-round">storefront</span></div>
-      CampusMarket
+      Skoop
     </a>
     <div class="nav-search">
       <span class="material-icons-round s-icon">search</span>
@@ -36,16 +36,18 @@
           <span class="material-icons-round" style="font-size:16px">add</span>List Item
         </button>
       </div>
-      <div id="userNav" style="display:none; align-items:center; gap:10px; flex-wrap:wrap;">
+      <div id="userNav" style="display:none; align-items:center; gap:14px; flex-wrap:wrap;">
         <span id="userEmail" style="font-size:0.85rem; color:var(--ink3)"></span>
-        <button class="btn btn-primary" onclick="openOverlay('postOverlay')">
-          <span class="material-icons-round" style="font-size:16px">add</span>List Item
+        <button class="icon-btn" onclick="loadAndShowMessages()" title="Messages" style="position:relative;">
+          <span class="material-icons-round">mail</span>
+          <span id="msgBadge" style="position:absolute; top:-6px; right:-6px; background:var(--primary); color:white; border-radius:50%; width:16px; height:16px; font-size:0.65rem; display:none; align-items:center; justify-content:center; font-weight:600;">0</span>
         </button>
-        <button class="btn btn-outline" onclick="loadAndShowMessages()">
-          <span class="material-icons-round" style="font-size:16px; position:relative;">mail</span><span id="msgBadge" style="position:absolute; top:-8px; right:-8px; background:var(--primary); color:white; border-radius:50%; width:18px; height:18px; font-size:0.7rem; display:none; align-items:center; justify-content:center;">0</span>Messages
+        <button class="icon-btn" onclick="loadNotifications()" title="Notifications" style="position:relative;">
+          <span class="material-icons-round">notifications</span>
+          <span id="notifBadge" style="position:absolute; top:-6px; right:-6px; background:#e74c3c; color:white; border-radius:50%; width:16px; height:16px; font-size:0.65rem; display:none; align-items:center; justify-content:center; font-weight:600;">0</span>
         </button>
-        <button class="btn btn-outline" onclick="handleLogout()">
-          <span class="material-icons-round" style="font-size:16px">logout</span>Sign out
+        <button class="btn btn-outline" onclick="handleLogout()" style="padding:8px 12px;">
+          <span class="material-icons-round" style="font-size:18px">logout</span>
         </button>
       </div>
     </div>
@@ -311,7 +313,7 @@
   <span id="toastMsg"></span>
 </div>
 
-<!-- CHAT MODAL -->
+<!-- MESSAGES MODAL -->
 <div class="overlay" id="messagesOverlay">
   <div class="modal" style="max-width:500px;">
     <div class="drag-handle"></div>
@@ -322,6 +324,22 @@
     <div class="modal-body" style="max-height:600px; overflow-y:auto;">
       <div id="messagesListContainer" style="display:grid; gap:8px;">
         <p style="color:var(--ink3); text-align:center; padding:20px;">Loading conversations...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- NOTIFICATIONS MODAL -->
+<div class="overlay" id="notificationsOverlay">
+  <div class="modal" style="max-width:500px;">
+    <div class="drag-handle"></div>
+    <div class="modal-head">
+      <div class="modal-title">Notifications</div>
+      <button class="close-btn" onclick="closeOverlay('notificationsOverlay'); if(notificationsUnsubscribe) notificationsUnsubscribe();"><span class="material-icons-round">close</span></button>
+    </div>
+    <div class="modal-body" style="max-height:600px; overflow-y:auto;">
+      <div id="notificationsContainer" style="display:grid; gap:8px;">
+        <p style="color:var(--ink3); text-align:center; padding:20px;">Loading notifications...</p>
       </div>
     </div>
   </div>

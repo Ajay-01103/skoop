@@ -56,6 +56,8 @@ function updateAuthUI() {
     authNav.style.display = 'flex';
     userNav.style.display = 'none';
   }
+  // Ensure overlays are closed when auth state changes
+  closeOverlay('loginOverlay');
 }
 
 function switchToSignup(e) {
@@ -239,35 +241,21 @@ async function loadAllListings() {
           price: parseInt(doc.data().price)
         }));
         
+        // If no listings from Firebase, use fallback
+        if (listings.length === 0) {
+          listings = fallbackListings;
+        }
         renderListings();
       }, error => {
         console.error('Real-time listener error:', error);
-        if (error.code === 'permission-denied') {
-          console.warn('Lists are public - this should not fail. Check Firebase project.');
-        }
-        // Fallback - try loading once
-        db.collection('listings')
-          .where('sold', '==', false)
-          .orderBy('createdAt', 'desc')
-          .limit(100)
-          .get()
-          .then(querySnapshot => {
-            listings = querySnapshot.docs.map(doc => ({
-              ...doc.data(),
-              id: doc.id,
-              price: parseInt(doc.data().price)
-            }));
-            renderListings();
-          })
-          .catch(err => {
-            console.error('Fallback listings load failed:', err);
-            if (err.code === 'permission-denied') {
-              console.warn('Firestore rules may not be set.');
-            }
-          });
+        // Use fallback listings immediately on error
+        listings = fallbackListings;
+        renderListings();
       });
   } catch (error) {
     console.log('Error setting up real-time listener:', error);
+    listings = fallbackListings;
+    renderListings();
   }
 }
 
@@ -632,6 +620,85 @@ function openChatFromConversation(chatId, otherUserId, sellerName) {
   loadMessages(currentChatId);
   closeOverlay('messagesOverlay');
   openOverlay('chatOverlay');
+}
+
+// ── NOTIFICATIONS ──
+let notificationsUnsubscribe = null;
+
+async function loadNotifications() {
+  if (!currentUser) {
+    showToast('warning', 'Please sign in to view notifications');
+    openOverlay('loginOverlay');
+    return;
+  }
+  
+  try {
+    // Listen to notifications collection for all users (broadcast)
+    if (notificationsUnsubscribe) notificationsUnsubscribe();
+    
+    notificationsUnsubscribe = db.collection('notifications')
+      .orderBy('createdAt', 'desc')
+      .limit(20)
+      .onSnapshot(querySnapshot => {
+        const notifs = querySnapshot.docs.map(doc => ({
+          ...doc.data(),
+          id: doc.id
+        }));
+        
+        // Update badge count
+        const unreadCount = notifs.filter(n => !n.read).length;
+        const badge = document.getElementById('notifBadge');
+        if (badge) {
+          badge.textContent = unreadCount;
+          badge.style.display = unreadCount > 0 ? 'flex' : 'none';
+        }
+        
+        // Display notifications
+        showNotificationsList(notifs);
+      }, error => {
+        console.error('Notifications listener error:', error);
+        showToast('error', 'Could not load notifications: ' + error.message);
+      });
+  } catch (error) {
+    console.error('Load notifications error:', error);
+    showToast('error', 'Failed to load notifications');
+  }
+}
+
+function showNotificationsList(notifs) {
+  const container = document.getElementById('notificationsContainer');
+  if (!container) {
+    // Create container if it doesn't exist
+    const overlay = document.getElementById('notificationsOverlay');
+    if (!overlay) return;
+    const modal = overlay.querySelector('.modal');
+    if (!modal) return;
+    const body = modal.querySelector('.modal-body');
+    if (!body) return;
+    const div = document.createElement('div');
+    div.id = 'notificationsContainer';
+    body.appendChild(div);
+  }
+  
+  if (notifs.length === 0) {
+    document.getElementById('notificationsContainer').innerHTML = `
+      <div style="text-align:center; padding:40px 20px; color:var(--ink3);">
+        <div style="font-size:3rem; margin-bottom:12px;">🔔</div>
+        <p>No notifications yet</p>
+      </div>
+    `;
+    return;
+  }
+  
+  document.getElementById('notificationsContainer').innerHTML = notifs.map(notif => `
+    <div style="padding:14px; background:var(--surface); border-radius:var(--radius-sm); border:1px solid var(--border); margin-bottom:10px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+        <div style="font-weight:500; color:var(--ink);">${notif.title || 'Notification'}</div>
+        <div style="font-size:0.75rem; color:var(--ink3);">${notif.createdAt ? new Date(notif.createdAt.toDate()).toLocaleString() : ''}</div>
+      </div>
+      <div style="font-size:0.9rem; color:var(--ink2);">${notif.message || ''}</div>
+    </div>
+  `).join('');
 }
 
 function generateConversationId(userId1, userId2) {

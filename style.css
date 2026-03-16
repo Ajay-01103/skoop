@@ -79,8 +79,17 @@ body {
 }
 .btn-outline:hover { background: var(--bg2); color: var(--ink); }
 .btn-primary { background: var(--accent); color: #fff; font-weight: 600; }
-.btn-primary:hover { background: #c0471f; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(212,82,42,.3); }
+.btn-primary:hover { background: #39294e; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(212,82,42,.3); }
 .btn-full { width: 100%; justify-content: center; border-radius: var(--radius-sm); padding: 14px; font-size: 0.95rem; }
+
+/* ICON BUTTONS */
+.icon-btn {
+  background: transparent; border: none; cursor: pointer;
+  padding: 6px; display: flex; align-items: center; justify-content: center;
+  color: var(--ink2); transition: color .18s, transform .18s;
+  border-radius: 8px;
+}
+.icon-btn:hover { color: var(--accent); transform: scale(1.1); }
 
 /* HERO */
 .hero {
@@ -430,7 +439,7 @@ textarea.input { resize: vertical; min-height: 86px; }
   border: none; cursor: pointer; margin-bottom: 4px;
   box-shadow: 0 4px 16px rgba(212,82,42,.35); transition: all .18s;
 }
-.mob-post-btn:hover { background: #c0471f; transform: scale(1.05); }
+.mob-post-btn:hover { background: #6a1fc0; transform: scale(1.05); }
 .mob-post-btn .material-icons-round { font-size: 23px; color: #fff; }
 
 /* RESPONSIVE */
@@ -442,17 +451,29 @@ textarea.input { resize: vertical; min-height: 86px; }
   .fc-pill { width: 148px; top: 120px; right: 30px; }
 }
 @media (max-width: 640px) {
+  .nav-inner { padding: 0 12px; height: 56px; gap: 8px; }
   .nav-search { display: none; }
+  .nav-actions { gap: 6px; }
+  .nav-actions .btn { padding: 8px 12px; font-size: 0.75rem; }
+  .nav-actions .btn-outline:not(:first-child) { display: none; }
+  #userEmail { display: none; }
+  .icon-btn .material-icons-round { font-size: 20px; }
   .hero-visual { display: none; }
   .hero h1 { font-size: 2rem; }
   .hero-stats { gap: 16px; }
   .mobile-nav { display: block; }
   body { padding-bottom: 80px; }
   .form-row { grid-template-columns: 1fr; }
-  .grid { grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 12px; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; padding: 0 12px; }
   .cat-chip { min-width: 74px; padding: 12px 13px; }
-  .nav-actions .btn-outline { display: none; }
+  .card { border-radius: 12px; }
+  .card-body { padding: 12px; }
+  .card-title { font-size: 0.9rem; }
+  .section { padding: 0 12px; }
 }
 @media (max-width: 360px) {
   .grid { grid-template-columns: 1fr 1fr; }
+  .modal-body { padding: 0 16px 20px; }
+  .form-group { margin-bottom: 14px; }
+  .input { padding: 10px 12px; font-size: 0.88rem; }
 }
