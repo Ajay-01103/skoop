@@ -32,12 +32,15 @@
         <button class="btn btn-outline" onclick="openOverlay('loginOverlay')" id="signInBtn">
           <span class="material-icons-round" style="font-size:16px">person_outline</span>Sign in
         </button>
+      </div>
+      <div id="userNav" style="display:none; align-items:center; gap:14px; flex-wrap:wrap;">
         <button class="btn btn-primary" onclick="openOverlay('postOverlay')">
           <span class="material-icons-round" style="font-size:16px">add</span>List Item
         </button>
-      </div>
-      <div id="userNav" style="display:none; align-items:center; gap:14px; flex-wrap:wrap;">
         <span id="userEmail" style="font-size:0.85rem; color:var(--ink3)"></span>
+        <button class="icon-btn" onclick="loadAndShowProfile()" title="Profile" style="position:relative;">
+          <span class="material-icons-round">person</span>
+        </button>
         <button class="icon-btn" onclick="loadAndShowMessages()" title="Messages" style="position:relative;">
           <span class="material-icons-round">mail</span>
           <span id="msgBadge" style="position:absolute; top:-6px; right:-6px; background:var(--primary); color:white; border-radius:50%; width:16px; height:16px; font-size:0.65rem; display:none; align-items:center; justify-content:center; font-weight:600;">0</span>
@@ -148,6 +151,7 @@
     </select>
   </div>
   <div class="grid" id="listingsGrid"></div>
+  <div id="paginationControls"></div>
 </div>
 
 <!-- MOBILE NAV -->
@@ -156,18 +160,26 @@
     <button class="mob-btn active">
       <span class="material-icons-round">home</span>Home
     </button>
-    <button class="mob-btn" onclick="document.getElementById('searchInput') && openOverlay('loginOverlay')">
+    <button class="mob-btn" onclick="openOverlay('mobileSearchOverlay')">
       <span class="material-icons-round">search</span>Search
     </button>
-    <button class="mob-post-btn" onclick="openOverlay('postOverlay')">
-      <span class="material-icons-round">add</span>
-    </button>
-    <button class="mob-btn">
-      <span class="material-icons-round">favorite_border</span>Saved
-    </button>
-    <button class="mob-btn" onclick="openOverlay('loginOverlay')">
-      <span class="material-icons-round">person_outline</span>Profile
-    </button>
+    <div id="mobileUserNav" style="display:none; gap:0; flex:1; justify-content:flex-end;">
+      <button class="mob-post-btn" onclick="openOverlay('postOverlay')">
+        <span class="material-icons-round">add</span>
+      </button>
+      <button class="mob-btn" onclick="loadAndShowProfile()">
+        <span class="material-icons-round">person</span>
+      </button>
+      <button class="mob-btn" onclick="loadAndShowMessages()">
+        <span class="material-icons-round">mail</span>
+      </button>
+      <button class="mob-btn" onclick="document.querySelectorAll('.wish-btn.liked').length > 0 ? alert('You have ' + document.querySelectorAll('.wish-btn.liked').length + ' saved items') : showToast('info', 'Start saving items')">
+        <span class="material-icons-round">favorite_border</span>
+      </button>
+      <button class="mob-btn" onclick="handleLogout()">
+        <span class="material-icons-round">logout</span>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -207,15 +219,9 @@
         <label>Description</label>
         <textarea class="input" placeholder="Describe your item — why you're selling, what's included, any defects..." id="newDesc"></textarea>
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Your Name *</label>
-          <input class="input" placeholder="e.g. Tunde A." id="newSeller">
-        </div>
-        <div class="form-group">
-          <label>WhatsApp Number</label>
-          <input class="input" placeholder="+234..." id="newPhone" type="tel">
-        </div>
+      <div class="form-group">
+        <label>Your Name *</label>
+        <input class="input" placeholder="e.g. Tunde A." id="newSeller">
       </div>
       <div class="form-group">
         <label>Photo *</label>
@@ -268,7 +274,12 @@
         </div>
         <div class="form-group">
           <label>Password</label>
-          <input class="input" placeholder="••••••••" type="password" id="loginPassword">
+          <div style="position:relative;">
+            <input class="input" placeholder="••••••••" type="password" id="loginPassword">
+            <button type="button" class="icon-toggle" onclick="togglePasswordVisibility('loginPassword', this)" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--ink3); cursor:pointer; display:flex; align-items:center; padding:4px;">
+              <span class="material-icons-round" style="font-size:20px;">visibility_off</span>
+            </button>
+          </div>
         </div>
         <button class="btn btn-primary btn-full" style="margin-bottom:14px" onclick="handleLogin()">
           Sign In
@@ -290,7 +301,12 @@
         </div>
         <div class="form-group">
           <label>Password (min 6 chars) *</label>
-          <input class="input" placeholder="••••••••" type="password" id="signupPassword">
+          <div style="position:relative;">
+            <input class="input" placeholder="••••••••" type="password" id="signupPassword">
+            <button type="button" class="icon-toggle" onclick="togglePasswordVisibility('signupPassword', this)" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--ink3); cursor:pointer; display:flex; align-items:center; padding:4px;">
+              <span class="material-icons-round" style="font-size:20px;">visibility_off</span>
+            </button>
+          </div>
         </div>
         <div class="form-group">
           <label>WhatsApp Number</label>
@@ -340,6 +356,102 @@
     <div class="modal-body" style="max-height:600px; overflow-y:auto;">
       <div id="notificationsContainer" style="display:grid; gap:8px;">
         <p style="color:var(--ink3); text-align:center; padding:20px;">Loading notifications...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MOBILE SEARCH MODAL -->
+<div class="overlay" id="mobileSearchOverlay">
+  <div class="modal" style="max-width:500px;">
+    <div class="drag-handle"></div>
+    <div class="modal-body" style="padding-top:20px;">
+      <div style="display:flex; gap:8px; margin-bottom:16px;">
+        <input type="text" id="mobileSearchInput" class="input" placeholder="Search listings..." style="flex:1; margin:0;" oninput="filterListings()">
+        <button class="btn btn-primary" onclick="closeOverlay('mobileSearchOverlay')" style="padding:11px 14px;">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div id="mobileSearchResults" style="max-height:400px; overflow-y:auto;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT PROFILE MODAL -->
+<div class="overlay" id="editProfileOverlay">
+  <div class="modal" style="max-width:500px;">
+    <div class="drag-handle"></div>
+    <div class="modal-head">
+      <div class="modal-title">Edit Profile</div>
+      <button class="close-btn" onclick="closeOverlay('editProfileOverlay')"><span class="material-icons-round">close</span></button>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid; gap:16px;">
+        <div style="text-align:center;">
+          <div style="width:80px; height:80px; background:var(--accent); border-radius:50%; margin:0 auto 12px; display:flex; align-items:center; justify-content:center; color:white; font-size:32px; font-weight:700; cursor:pointer;" id="editProfileAvatar" onclick="document.getElementById('profilePicInput').click()"></div>
+          <p style="font-size:0.8rem; color:var(--ink3);">Click avatar to change photo</p>
+          <input type="file" id="profilePicInput" accept="image/*" style="display:none;" onchange="handleProfilePicChange(event)">
+        </div>
+        
+        <div class="form-group">
+          <label>Name</label>
+          <input type="text" id="editProfileName" class="input" placeholder="Your name">
+        </div>
+        
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="tel" id="editProfilePhone" class="input" placeholder="Your phone number">
+        </div>
+        
+        <button class="btn btn-primary btn-full" onclick="saveProfileChanges()">
+          <span class="material-icons-round">check</span>Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="profileOverlay">
+  <div class="modal" style="max-width:500px;">
+    <div class="drag-handle"></div>
+    <div class="modal-head">
+      <div class="modal-title">My Profile</div>
+      <button class="close-btn" onclick="closeOverlay('profileOverlay')"><span class="material-icons-round">close</span></button>
+    </div>
+    <div class="modal-body">
+      <div id="profileContent" style="display:grid; gap:16px;">
+        <div style="text-align:center; padding:20px; position:relative;">
+          <div style="width:64px; height:64px; background:var(--accent); border-radius:50%; margin:0 auto 16px; display:flex; align-items:center; justify-content:center; color:white; font-size:28px; font-weight:700;" id="profileAvatar"></div>
+          <div style="font-size:1.2rem; font-weight:600; color:var(--ink);" id="profileName"></div>
+          <div style="font-size:0.85rem; color:var(--ink3); margin-bottom:12px;" id="profileEmail"></div>
+          <button class="btn btn-outline" onclick="openEditProfile()" style="padding:8px 14px; font-size:0.8rem;">
+            <span class="material-icons-round" style="font-size:16px;">edit</span>Edit Profile
+          </button>
+        </div>
+        
+        <div style="border-top:1px solid var(--border); padding-top:16px;">
+          <div style="font-size:0.75rem; font-weight:600; color:var(--ink3); text-transform:uppercase; margin-bottom:12px;">Seller Stats</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div style="background:var(--bg); padding:14px; border-radius:var(--radius-sm); text-align:center;">
+              <div style="font-size:1.5rem; font-weight:700; color:var(--accent);" id="profileSales">0</div>
+              <div style="font-size:0.75rem; color:var(--ink3); margin-top:4px;">Sales</div>
+            </div>
+            <div style="background:var(--bg); padding:14px; border-radius:var(--radius-sm); text-align:center;">
+              <div style="font-size:1.5rem; font-weight:700; color:var(--accent2);" id="profileRating">5.0</div>
+              <div style="font-size:0.75rem; color:var(--ink3); margin-top:4px;">Rating</div>
+            </div>
+          </div>
+        </div>
+        
+        <div style="border-top:1px solid var(--border); padding-top:16px;">
+          <div style="font-size:0.75rem; font-weight:600; color:var(--ink3); text-transform:uppercase; margin-bottom:12px;">My Listings</div>
+          <div id="profileListings" style="display:grid; gap:10px; max-height:300px; overflow-y:auto;">
+            <p style="color:var(--ink3); text-align:center; padding:20px;">Loading listings...</p>
+          </div>
+        </div>
+        
+        <button class="btn btn-primary btn-full" onclick="openOverlay('postOverlay'); closeOverlay('profileOverlay');">
+          <span class="material-icons-round">add</span>Create New Listing
+        </button>
       </div>
     </div>
   </div>

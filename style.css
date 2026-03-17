@@ -213,7 +213,19 @@ body {
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
-  gap: 18px; margin-bottom: 80px;
+  gap: 18px; margin-bottom: 24px;
+}
+
+/* PAGINATION */
+#paginationControls {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-bottom: 60px; flex-wrap: wrap;
+}
+#paginationControls .btn {
+  padding: 10px 14px; font-size: 0.85rem;
+}
+#paginationControls .btn:disabled {
+  opacity: 0.5; cursor: not-allowed;
 }
 
 /* CARD */
@@ -444,11 +456,17 @@ textarea.input { resize: vertical; min-height: 86px; }
 
 /* RESPONSIVE */
 @media (max-width: 900px) {
-  .hero { grid-template-columns: 1fr; gap: 32px; padding: 40px 24px 32px; }
+  .hero { grid-template-columns: 1fr; gap: 32px; padding: 40px 24px 32px; text-align: center; }
+  .hero > div:first-child { margin: 0 auto; }
+  .hero-label { justify-content: center; margin-left: auto; margin-right: auto; }
+  .hero h1 { margin-left: auto; margin-right: auto; }
+  .hero p { margin-left: auto; margin-right: auto; }
+  .hero-cta { justify-content: center; }
+  .hero-stats { justify-content: center; margin-left: auto; margin-right: auto; }
   .hero-visual { height: 260px; }
-  .fc-main { width: 165px; top: 10px; left: 20px; }
-  .fc-side { width: 155px; bottom: 10px; right: 10px; }
-  .fc-pill { width: 148px; top: 120px; right: 30px; }
+  .fc-main { width: 165px; top: 10px; left: 50%; transform: translateX(-50%); }
+  .fc-side { width: 155px; bottom: 10px; right: auto; left: 50%; transform: translateX(-50%); }
+  .fc-pill { width: 148px; top: 120px; right: auto; left: 50%; transform: translateX(-50%); }
 }
 @media (max-width: 640px) {
   .nav-inner { padding: 0 12px; height: 56px; gap: 8px; }

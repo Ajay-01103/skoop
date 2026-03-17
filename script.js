@@ -43,18 +43,23 @@ const storage = firebase.storage();
 let currentUser = null;
 let pendingImg = null;
 let listings = [];
+let currentPage = 1;
+const ITEMS_PER_PAGE = 15;
 
 function updateAuthUI() {
   const authNav = document.getElementById('authNav');
   const userNav = document.getElementById('userNav');
+  const mobileUserNav = document.getElementById('mobileUserNav');
   
   if (currentUser) {
     authNav.style.display = 'none';
     userNav.style.display = 'flex';
+    mobileUserNav.style.display = 'flex';
     document.getElementById('userEmail').textContent = currentUser.email;
   } else {
     authNav.style.display = 'flex';
     userNav.style.display = 'none';
+    mobileUserNav.style.display = 'none';
   }
   // Ensure overlays are closed when auth state changes
   closeOverlay('loginOverlay');
@@ -72,6 +77,19 @@ function switchToLogin(e) {
   document.getElementById('loginForm').style.display = 'block';
   document.getElementById('signupForm').style.display = 'none';
   document.getElementById('authTitle').textContent = 'Sign in to Skoop';
+}
+
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  const icon = btn.querySelector('.material-icons-round');
+  
+  if (input.type === 'password') {
+    input.type = 'text';
+    icon.textContent = 'visibility';
+  } else {
+    input.type = 'password';
+    icon.textContent = 'visibility_off';
+  }
 }
 
 async function handleLogin() {
@@ -285,7 +303,16 @@ function getFiltered() {
 function renderListings() {
   const data = getFiltered();
   const grid = document.getElementById('listingsGrid');
-  document.getElementById('listingsCount').textContent = `Showing ${data.length} listing${data.length !== 1 ? 's' : ''}`;
+  
+  // Calculate pagination
+  const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
+  if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+  if (currentPage < 1) currentPage = 1;
+  
+  const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedData = data.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+  
+  document.getElementById('listingsCount').textContent = `Showing ${paginatedData.length} listing${paginatedData.length !== 1 ? 's' : ''} (Page ${currentPage}/${totalPages})`;
   document.getElementById('stat-count').textContent = listings.length;
 
   if (!data.length) {
@@ -293,10 +320,11 @@ function renderListings() {
       <div class="empty-icon"><span class="material-icons-round">search_off</span></div>
       <h3>No listings found</h3><p>Try a different category or search term</p>
     </div>`;
+    document.getElementById('paginationControls').innerHTML = '';
     return;
   }
 
-  grid.innerHTML = data.map((l, i) => {
+  grid.innerHTML = paginatedData.map((l, i) => {
     const col = COLORS[l.id % COLORS.length];
     const init = (l.seller || '').split(' ').filter(w=>w).map(w=>w[0]).join('').slice(0,2).toUpperCase();
     const isNew = l.condition === 'Brand New';
@@ -335,20 +363,130 @@ function renderListings() {
       </div>
     </div>`;
   }).join('');
+  
+  // Render pagination controls
+  renderPagination(totalPages);
+}
+
+function renderPagination(totalPages) {
+  const controls = document.getElementById('paginationControls');
+  if (totalPages <= 1) {
+    controls.innerHTML = '';
+    return;
+  }
+  
+  let html = '<div style="display:flex; align-items:center; justify-content:center; gap:8px; margin-top:24px;">'
+  
+  // Previous button
+  html += `<button class="btn btn-outline" onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>
+    <span class="material-icons-round">chevron_left</span>
+  </button>`;
+  
+  // Page numbers
+  const maxButtons = 5;
+  let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+  let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+  if (endPage - startPage + 1 < maxButtons) {
+    startPage = Math.max(1, endPage - maxButtons + 1);
+  }
+  
+  if (startPage > 1) html += `<button class="btn btn-outline" onclick="goToPage(1)" style="min-width:36px;">1</button>`;
+  if (startPage > 2) html += `<span style="color:var(--ink3);">...</span>`;
+  
+  for (let i = startPage; i <= endPage; i++) {
+    html += `<button class="btn ${i === currentPage ? 'btn-primary' : 'btn-outline'}" onclick="goToPage(${i})" style="min-width:36px;">${i}</button>`;
+  }
+  
+  if (endPage < totalPages - 1) html += `<span style="color:var(--ink3);">...</span>`;
+  if (endPage < totalPages) html += `<button class="btn btn-outline" onclick="goToPage(${totalPages})" style="min-width:36px;">${totalPages}</button>`;
+  
+  // Next button
+  html += `<button class="btn btn-outline" onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>
+    <span class="material-icons-round">chevron_right</span>
+  </button>`;
+  
+  html += '</div>';
+  controls.innerHTML = html;
+}
+
+function goToPage(page) {
+  currentPage = page;
+  renderListings();
+  // Smooth scroll to listings section
+  document.getElementById('listings').scrollIntoView({ behavior: 'smooth' });
 }
 
 // ── FILTER/SORT ──
 function filterListings() {
-  activeSearch = document.getElementById('searchInput').value.toLowerCase();
-  renderListings();
+  // Handle both desktop and mobile search inputs
+  const desktopInput = document.getElementById('searchInput');
+  const mobileInput = document.getElementById('mobileSearchInput');
+  const mobileOverlay = document.getElementById('mobileSearchOverlay');
+  
+  // Check if mobile search is active (overlay is open)
+  const isMobileSearchActive = mobileOverlay && mobileOverlay.classList.contains('open');
+  
+  if (isMobileSearchActive && mobileInput) {
+    // Mobile search is active - render to mobile results
+    activeSearch = mobileInput.value.toLowerCase();
+    renderMobileSearchResults();
+  } else {
+    // Desktop search - render to main grid
+    activeSearch = desktopInput ? desktopInput.value.toLowerCase() : '';
+    currentPage = 1;
+    renderListings();
+  }
+}
+
+function renderMobileSearchResults() {
+  const data = getFiltered();
+  const container = document.getElementById('mobileSearchResults');
+  
+  if (!data.length) {
+    container.innerHTML = `<div class="empty" style="padding:20px; text-align:center;">
+      <div class="empty-icon"><span class="material-icons-round">search_off</span></div>
+      <h3>No listings found</h3>
+      <p>Try a different search term</p>
+    </div>`;
+    return;
+  }
+  
+  container.innerHTML = data.map((l, i) => {
+    const col = COLORS[l.id % COLORS.length];
+    const init = (l.seller || '').split(' ').filter(w=>w).map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const isNew = l.condition === 'Brand New';
+    const isSvc = l.cat === 'Services';
+    const titleSafe = (l.title||'').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const sellerSafe = (l.seller||'').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const imgEl = l.img
+      ? `<img src="${l.img}" alt="${titleSafe}" style="width:100%;height:100%;object-fit:cover;">`
+      : `<span class="material-icons-round">${CAT_ICONS[l.cat]||'category'}</span>`;
+    const wished = wishlist.has(l.id);
+
+    return `<div class="card" style="display:flex; gap:12px; padding:12px; border-bottom:1px solid var(--border); cursor:pointer;" onclick="openDetail('${l.id}'); closeOverlay('mobileSearchOverlay')">
+      <div class="card-img" style="width:80px; height:80px; flex-shrink:0; border-radius:var(--radius); background:${col}; display:flex; align-items:center; justify-content:center; color:white; font-size:24px; overflow:hidden;">
+        ${imgEl}
+      </div>
+      <div class="card-body" style="flex:1;">
+        <div class="card-cat-label" style="font-size:11px; opacity:0.6;">${l.cat}</div>
+        <div class="card-title" style="margin:4px 0; font-weight:600;">${titleSafe}</div>
+        <div class="card-price" style="color:var(--accent); font-weight:700; margin:4px 0;">₦${Number(l.price).toLocaleString()}</div>
+        <div class="card-seller" style="display:flex; align-items:center; gap:6px; font-size:12px; opacity:0.7;">
+          <div class="avatar" style="width:24px; height:24px; border-radius:50%; background:${col}; display:flex; align-items:center; justify-content:center; color:white; font-size:10px; font-weight:700;">${init}</div>
+          ${sellerSafe.split(' ')[0]}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 function filterCat(cat, el) {
   activeCat = cat;
   document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('active'));
   if (el) el.classList.add('active');
+  currentPage = 1;
   renderListings();
 }
-function sortListings(v) { sortMode = v; renderListings(); }
+function sortListings(v) { sortMode = v; currentPage = 1; renderListings(); }
 
 // ── DETAIL ──
 function openDetail(id) {
@@ -412,6 +550,42 @@ function openDetail(id) {
 }
 
 // ── POST ──
+function compressImage(file, callback, quality = 0.7, maxWidth = 1200, maxHeight = 1200) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+      
+      // Calculate new dimensions maintaining aspect ratio
+      if (width > height) {
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      canvas.toBlob((blob) => {
+        callback(new File([blob], file.name, { type: 'image/jpeg' }));
+      }, 'image/jpeg', quality);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 function handleImg(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -429,17 +603,21 @@ function handleImg(e) {
   }
   
   try {
-    // Store file for upload during listing creation
-    pendingImg = file;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      // Show preview
-      document.getElementById('uploadZone').style.display = 'none';
-      document.getElementById('imagePreview').style.display = 'block';
-      document.getElementById('previewImg').src = ev.target.result;
-      showToast('check_circle', 'Sharp Joor!');
-    };
-    reader.readAsDataURL(file);
+    // Compress image
+    showToast('info', 'Compressing image...');
+    compressImage(file, (compressedFile) => {
+      // Store compressed file for upload during listing creation
+      pendingImg = compressedFile;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        // Show preview
+        document.getElementById('uploadZone').style.display = 'none';
+        document.getElementById('imagePreview').style.display = 'block';
+        document.getElementById('previewImg').src = ev.target.result;
+        showToast('check_circle', 'Sharp Joor! (compressed)');
+      };
+      reader.readAsDataURL(compressedFile);
+    });
   } catch (error) {
     console.error('Image selection error:', error);
     showToast('error', 'Failed to select image');
@@ -469,7 +647,6 @@ function postListing() {
   const cond   = document.getElementById('newCondition').value;
   const desc   = document.getElementById('newDesc').value.trim();
   const seller = document.getElementById('newSeller').value.trim();
-  const phone  = document.getElementById('newPhone').value.trim();
 
   if (!title || !price || !seller) { showToast('warning','Please fill in all required fields'); return; }
   
@@ -480,6 +657,13 @@ function postListing() {
   (async () => {
     try {
       let imgUrl = null;
+      let userPhone = null;
+      
+      // Get user phone from profile
+      const userDoc = await db.collection('users').doc(currentUser.uid).get();
+      if (userDoc.exists && userDoc.data().phone) {
+        userPhone = userDoc.data().phone;
+      }
       
       // Upload image to Firebase Storage
       if (pendingImg instanceof File) {
@@ -509,7 +693,7 @@ function postListing() {
         sellerId: currentUser.uid,
         condition: cond,
         desc: desc || 'No description provided.',
-        phone: phone || null,
+        phone: userPhone || null,
         img: imgUrl,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         views: 0,
@@ -520,7 +704,7 @@ function postListing() {
       
       // Clear form
       pendingImg = null;
-      ['newTitle','newPrice','newDesc','newSeller','newPhone'].forEach(id => document.getElementById(id).value = '');
+      ['newTitle','newPrice','newDesc','newSeller'].forEach(id => document.getElementById(id).value = '');
       document.getElementById('newCondition').value = 'Brand New';
       document.getElementById('fileInput').value = '';
       document.getElementById('uploadZone').style.display = 'block';
@@ -556,6 +740,29 @@ function toggleWish(e, id) {
 // ── MESSAGING ──
 let currentChatId = null;
 let messagesUnsubscribe = null;
+
+// ── AUTH STATE ──
+let authReady = false;
+
+async function waitForAuth() {
+  return new Promise(resolve => {
+    if (authReady) {
+      resolve();
+    } else {
+      const checkAuth = setInterval(() => {
+        if (authReady) {
+          clearInterval(checkAuth);
+          resolve();
+        }
+      }, 100);
+      // Timeout after 5 seconds
+      setTimeout(() => {
+        clearInterval(checkAuth);
+        resolve();
+      }, 5000);
+    }
+  });
+}
 
 async function loadAndShowMessages() {
   if (!currentUser) {
@@ -620,6 +827,206 @@ function openChatFromConversation(chatId, otherUserId, sellerName) {
   loadMessages(currentChatId);
   closeOverlay('messagesOverlay');
   openOverlay('chatOverlay');
+}
+
+// ── PROFILE ──
+function loadAndShowProfile() {
+  if (!currentUser) {
+    showToast('warning', 'Please sign in to view profile');
+    openOverlay('loginOverlay');
+    return;
+  }
+  
+  // Close any open overlays first
+  document.querySelectorAll('.overlay.open').forEach(o => o.classList.remove('open'));
+  document.body.style.overflow = '';
+  
+  _loadProfileData();
+}
+
+async function _loadProfileData() {
+  try {
+    // Get user data
+    const userDoc = await db.collection('users').doc(currentUser.uid).get();
+    const userData = userDoc.exists ? userDoc.data() : {};
+    
+    // Get user's listings
+    const listingsSnapshot = await db.collection('listings')
+      .where('sellerId', '==', currentUser.uid)
+      .orderBy('createdAt', 'desc')
+      .get();
+    
+    const userListings = listingsSnapshot.docs.map(doc => ({
+      ...doc.data(),
+      id: doc.id,
+      price: parseInt(doc.data().price)
+    }));
+    
+    // Update profile UI
+    const name = userData.name || currentUser.email.split('@')[0];
+    const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    
+    // Update avatar with profile picture or initials
+    const avatarEl = document.getElementById('profileAvatar');
+    if (userData.profilePicUrl) {
+      avatarEl.style.backgroundImage = `url(${userData.profilePicUrl})`;
+      avatarEl.style.backgroundSize = 'cover';
+      avatarEl.style.backgroundPosition = 'center';
+      avatarEl.textContent = '';
+    } else {
+      avatarEl.style.backgroundImage = '';
+      avatarEl.textContent = initials;
+    }
+    
+    document.getElementById('profileName').textContent = name;
+    document.getElementById('profileEmail').textContent = currentUser.email;
+    document.getElementById('profileSales').textContent = userData.sales || 0;
+    document.getElementById('profileRating').textContent = (userData.rating || 5.0).toFixed(1);
+    
+    // Display listings
+    const listingsContainer = document.getElementById('profileListings');
+    if (userListings.length === 0) {
+      listingsContainer.innerHTML = '<p style="color:var(--ink3); text-align:center; padding:20px;">No listings yet</p>';
+    } else {
+      listingsContainer.innerHTML = userListings.map(l => `
+        <div style="padding:12px; background:var(--bg); border-radius:var(--radius-sm); cursor:pointer;" onclick="openDetail('${l.id}')">
+          <div style="font-weight:500; color:var(--ink); font-size:0.9rem;">${(l.title || '').slice(0, 40)}</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+            <div style="color:var(--accent); font-weight:600;">₦${Number(l.price).toLocaleString()}</div>
+            <div style="font-size:0.75rem; color:var(--ink3); background:var(--surface); padding:3px 8px; border-radius:4px;">
+              ${l.sold ? 'Sold' : 'Active'}
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+    
+    openOverlay('profileOverlay');
+  } catch (error) {
+    console.error('Load profile error:', error);
+    showToast('error', 'Failed to load profile: ' + error.message);
+  }
+}
+
+// ── PROFILE EDITING ──
+let pendingProfilePic = null;
+
+function openEditProfile() {
+  if (!currentUser) return;
+  
+  // Get current user data
+  db.collection('users').doc(currentUser.uid).get().then(doc => {
+    const userData = doc.exists ? doc.data() : {};
+    
+    // Populate edit form with current data
+    document.getElementById('editProfileName').value = userData.name || currentUser.email.split('@')[0];
+    document.getElementById('editProfilePhone').value = userData.phone || '';
+    
+    // Reset avatar preview to initials
+    const name = userData.name || currentUser.email.split('@')[0];
+    const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    const avatar = document.getElementById('editProfileAvatar');
+    avatar.textContent = initials;
+    avatar.style.backgroundImage = '';
+    avatar.style.display = 'flex';
+    avatar.style.alignItems = 'center';
+    avatar.style.justifyContent = 'center';
+    avatar.style.color = 'white';
+    avatar.style.fontSize = '28px';
+    avatar.style.fontWeight = '700';
+    
+    pendingProfilePic = null;
+    
+    closeOverlay('profileOverlay');
+    openOverlay('editProfileOverlay');
+  }).catch(error => {
+    console.error('Get user data error:', error);
+    showToast('error', 'Failed to load profile');
+  });
+}
+
+function handleProfilePicChange(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  // Validate file type
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    showToast('warning', 'Please upload JPG, PNG, or WebP image');
+    return;
+  }
+  
+  // Validate file size (max 5MB)
+  if (file.size > 5242880) {
+    showToast('warning', 'File is too large (max 5MB)');
+    return;
+  }
+  
+  // Compress profile picture
+  showToast('info', 'Compressing image...');
+  compressImage(file, (compressedFile) => {
+    pendingProfilePic = compressedFile;
+    
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = e => {
+      const avatar = document.getElementById('editProfileAvatar');
+      avatar.style.backgroundImage = `url(${e.target.result})`;
+      avatar.style.backgroundSize = 'cover';
+      avatar.style.backgroundPosition = 'center';
+      avatar.textContent = '';
+      avatar.style.color = 'transparent';
+      showToast('check_circle', 'Photo compressed!');
+    };
+    reader.readAsDataURL(compressedFile);
+  }, 0.8, 800, 800);
+}
+
+async function saveProfileChanges() {
+  if (!currentUser) return;
+  
+  const name = document.getElementById('editProfileName').value.trim();
+  const phone = document.getElementById('editProfilePhone').value.trim();
+  
+  if (!name) {
+    showToast('warning', 'Please enter a name');
+    return;
+  }
+  
+  showToast('info', 'Saving profile...');
+  
+  try {
+    let profilePicUrl = null;
+    
+    // Upload picture if selected
+    if (pendingProfilePic) {
+      const timestamp = Date.now();
+      const fileName = `users/${currentUser.uid}/profile_${timestamp}.jpg`;
+      
+      // Upload to storage
+      await storage.ref(fileName).put(pendingProfilePic);
+      
+      // Get download URL
+      profilePicUrl = await storage.ref(fileName).getDownloadURL();
+    }
+    
+    // Update Firestore user document
+    const updateData = { name, phone };
+    if (profilePicUrl) updateData.profilePicUrl = profilePicUrl;
+    
+    await db.collection('users').doc(currentUser.uid).update(updateData);
+    
+    showToast('check_circle', 'Profile updated!');
+    
+    // Reset
+    pendingProfilePic = null;
+    closeOverlay('editProfileOverlay');
+    
+    // Reload profile
+    _loadProfileData();
+  } catch (error) {
+    console.error('Save profile error:', error);
+    showToast('error', 'Failed to save: ' + error.message);
+  }
 }
 
 // ── NOTIFICATIONS ──
@@ -687,6 +1094,7 @@ function showNotificationsList(notifs) {
         <p>No notifications yet</p>
       </div>
     `;
+    openOverlay('notificationsOverlay');
     return;
   }
   
@@ -699,6 +1107,8 @@ function showNotificationsList(notifs) {
       <div style="font-size:0.9rem; color:var(--ink2);">${notif.message || ''}</div>
     </div>
   `).join('');
+  
+  openOverlay('notificationsOverlay');
 }
 
 function generateConversationId(userId1, userId2) {
@@ -927,6 +1337,7 @@ loadAllListings();
 // Monitor auth state changes
 firebase.auth().onAuthStateChanged(user => {
   currentUser = user;
+  authReady = true;
   updateAuthUI();
   if (user) {
     loadUserListings();
