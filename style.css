@@ -436,19 +436,21 @@ textarea.input { resize: vertical; min-height: 86px; }
   z-index: 200; background: var(--surface); border-top: 1px solid var(--border);
   padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
 }
-.mobile-nav-inner { display: flex; justify-content: space-around; align-items: flex-end; }
+.mobile-nav-inner { display: flex; justify-content: space-around; align-items: center; }
 .mob-btn {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
   background: transparent; border: none; cursor: pointer;
-  padding: 4px 12px; color: var(--ink3);
-  font-family: var(--font-body); font-size: 0.67rem; font-weight: 500; transition: color .15s;
+  padding: 8px 12px; color: var(--ink3);
+  font-family: var(--font-body); font-size: 0.65rem; font-weight: 500; transition: color .15s; white-space: nowrap;
 }
 .mob-btn.active { color: var(--accent); }
-.mob-btn .material-icons-round { font-size: 22px; }
+.mob-btn .material-icons-round { font-size: 24px; }
+#mobileUserNav { display: flex; justify-content: space-around; align-items: center; flex: 1; }
+#mobileUserNav.hidden { display: none !important; }
 .mob-post-btn {
   width: 50px; height: 50px; background: var(--accent); border-radius: 15px;
   display: flex; align-items: center; justify-content: center;
-  border: none; cursor: pointer; margin-bottom: 4px;
+  border: none; cursor: pointer;
   box-shadow: 0 4px 16px rgba(212,82,42,.35); transition: all .18s;
 }
 .mob-post-btn:hover { background: #6a1fc0; transform: scale(1.05); }

@@ -34,13 +34,7 @@
         </button>
       </div>
       <div id="userNav" style="display:none; align-items:center; gap:14px; flex-wrap:wrap;">
-        <button class="btn btn-primary" onclick="openOverlay('postOverlay')">
-          <span class="material-icons-round" style="font-size:16px">add</span>List Item
-        </button>
         <span id="userEmail" style="font-size:0.85rem; color:var(--ink3)"></span>
-        <button class="icon-btn" onclick="loadAndShowProfile()" title="Profile" style="position:relative;">
-          <span class="material-icons-round">person</span>
-        </button>
         <button class="icon-btn" onclick="loadAndShowMessages()" title="Messages" style="position:relative;">
           <span class="material-icons-round">mail</span>
           <span id="msgBadge" style="position:absolute; top:-6px; right:-6px; background:var(--primary); color:white; border-radius:50%; width:16px; height:16px; font-size:0.65rem; display:none; align-items:center; justify-content:center; font-weight:600;">0</span>
@@ -48,9 +42,6 @@
         <button class="icon-btn" onclick="loadNotifications()" title="Notifications" style="position:relative;">
           <span class="material-icons-round">notifications</span>
           <span id="notifBadge" style="position:absolute; top:-6px; right:-6px; background:#e74c3c; color:white; border-radius:50%; width:16px; height:16px; font-size:0.65rem; display:none; align-items:center; justify-content:center; font-weight:600;">0</span>
-        </button>
-        <button class="btn btn-outline" onclick="handleLogout()" style="padding:8px 12px;">
-          <span class="material-icons-round" style="font-size:18px">logout</span>
         </button>
       </div>
     </div>
@@ -163,23 +154,15 @@
     <button class="mob-btn" onclick="openOverlay('mobileSearchOverlay')">
       <span class="material-icons-round">search</span>Search
     </button>
-    <div id="mobileUserNav" style="display:none; gap:0; flex:1; justify-content:flex-end;">
-      <button class="mob-post-btn" onclick="openOverlay('postOverlay')">
-        <span class="material-icons-round">add</span>
-      </button>
-      <button class="mob-btn" onclick="loadAndShowProfile()">
-        <span class="material-icons-round">person</span>
-      </button>
-      <button class="mob-btn" onclick="loadAndShowMessages()">
-        <span class="material-icons-round">mail</span>
-      </button>
-      <button class="mob-btn" onclick="document.querySelectorAll('.wish-btn.liked').length > 0 ? alert('You have ' + document.querySelectorAll('.wish-btn.liked').length + ' saved items') : showToast('info', 'Start saving items')">
-        <span class="material-icons-round">favorite_border</span>
-      </button>
-      <button class="mob-btn" onclick="handleLogout()">
-        <span class="material-icons-round">logout</span>
-      </button>
-    </div>
+    <button class="mob-btn" id="listBtn" onclick="openOverlay('postOverlay')" style="display:none;">
+      <span class="material-icons-round">add_circle</span>List
+    </button>
+    <button class="mob-btn" id="savedBtn" onclick="renderSavedItems(); openOverlay('savedOverlay')" style="display:none;">
+      <span class="material-icons-round">favorite</span>Saved
+    </button>
+    <button class="mob-btn" id="profileBtn" onclick="loadAndShowProfile()" style="display:none;">
+      <span class="material-icons-round">person</span>Profile
+    </button>
   </div>
 </div>
 
@@ -220,8 +203,10 @@
         <textarea class="input" placeholder="Describe your item — why you're selling, what's included, any defects..." id="newDesc"></textarea>
       </div>
       <div class="form-group">
-        <label>Your Name *</label>
-        <input class="input" placeholder="e.g. Tunde A." id="newSeller">
+        <label>Location *</label>
+        <select class="input" id="newLocation">
+          <option>On Campus</option><option>Off Campus</option>
+        </select>
       </div>
       <div class="form-group">
         <label>Photo *</label>
@@ -452,6 +437,10 @@
         <button class="btn btn-primary btn-full" onclick="openOverlay('postOverlay'); closeOverlay('profileOverlay');">
           <span class="material-icons-round">add</span>Create New Listing
         </button>
+        
+        <button class="btn btn-outline btn-full" onclick="handleLogout(); closeOverlay('profileOverlay');">
+          <span class="material-icons-round">logout</span>Logout
+        </button>
       </div>
     </div>
   </div>
@@ -472,6 +461,20 @@
           <span class="material-icons-round" style="font-size:16px">send</span>
         </button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- SAVED ITEMS OVERLAY -->
+<div class="overlay" id="savedOverlay">
+  <div class="modal" style="max-width:600px;">
+    <div class="drag-handle"></div>
+    <div class="modal-head">
+      <div class="modal-title">Your Saved Items</div>
+      <button class="close-btn" onclick="closeOverlay('savedOverlay')"><span class="material-icons-round">close</span></button>
+    </div>
+    <div class="modal-body" style="max-height:600px; overflow-y:auto;">
+      <div id="savedItemsContainer" class="grid"></div>
     </div>
   </div>
 </div>

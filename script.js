@@ -49,17 +49,23 @@ const ITEMS_PER_PAGE = 15;
 function updateAuthUI() {
   const authNav = document.getElementById('authNav');
   const userNav = document.getElementById('userNav');
-  const mobileUserNav = document.getElementById('mobileUserNav');
+  const listBtn = document.getElementById('listBtn');
+  const savedBtn = document.getElementById('savedBtn');
+  const profileBtn = document.getElementById('profileBtn');
   
   if (currentUser) {
     authNav.style.display = 'none';
     userNav.style.display = 'flex';
-    mobileUserNav.style.display = 'flex';
+    if (listBtn) listBtn.style.display = 'flex';
+    if (savedBtn) savedBtn.style.display = 'flex';
+    if (profileBtn) profileBtn.style.display = 'flex';
     document.getElementById('userEmail').textContent = currentUser.email;
   } else {
     authNav.style.display = 'flex';
     userNav.style.display = 'none';
-    mobileUserNav.style.display = 'none';
+    if (listBtn) listBtn.style.display = 'none';
+    if (savedBtn) savedBtn.style.display = 'none';
+    if (profileBtn) profileBtn.style.display = 'none';
   }
   // Ensure overlays are closed when auth state changes
   closeOverlay('loginOverlay');
@@ -226,7 +232,29 @@ const CAT_ICONS = {
 const COND_ICONS = { 'Brand New':'new_releases','Like New':'thumb_up','Good':'done','Fair':'warning_amber' };
 
 let activeCat = 'all', activeSearch = '', sortMode = 'newest';
-const wishlist = new Set();
+
+// Initialize wishlist from localStorage or create empty
+let wishlist = new Set();
+function loadWishlist() {
+  try {
+    const saved = localStorage.getItem('skoop_wishlist');
+    wishlist = new Set(saved ? JSON.parse(saved) : []);
+  } catch (e) {
+    console.error('Failed to load wishlist:', e);
+    wishlist = new Set();
+  }
+}
+
+function saveWishlist() {
+  try {
+    localStorage.setItem('skoop_wishlist', JSON.stringify(Array.from(wishlist)));
+  } catch (e) {
+    console.error('Failed to save wishlist:', e);
+  }
+}
+
+// Load wishlist on startup
+loadWishlist();
 
 // ⚠️ FIREBASE STORAGE SECURITY RULES (Add to Firebase Console):
 // rules_version = '2';
@@ -641,60 +669,56 @@ function postListing() {
     return;
   }
 
-  const title  = document.getElementById('newTitle').value.trim();
-  const price  = document.getElementById('newPrice').value;
-  const cat    = document.getElementById('newCat').value;
-  const cond   = document.getElementById('newCondition').value;
-  const desc   = document.getElementById('newDesc').value.trim();
-  const seller = document.getElementById('newSeller').value.trim();
+  const title    = document.getElementById('newTitle').value.trim();
+  const price    = document.getElementById('newPrice').value;
+  const cat      = document.getElementById('newCat').value;
+  const cond     = document.getElementById('newCondition').value;
+  const desc     = document.getElementById('newDesc').value.trim();
+  const location = document.getElementById('newLocation').value.trim();
 
-  if (!title || !price || !seller) { showToast('warning','Please fill in all required fields'); return; }
+  if (!title || !price || !location) { showToast('warning','Please fill in all required fields'); return; }
   
   if (!pendingImg) { showToast('warning','Please add a photo to your listing'); return; }
 
-  showToast('info', 'Uploading image...');
+  showToast('info', 'Creating listing...');
   
   (async () => {
     try {
-      let imgUrl = null;
+      let imgData = null;
       let userPhone = null;
+      let sellerName = currentUser.displayName || 'Anonymous';
       
-      // Get user phone from profile
+      // Get user phone and name from profile
       const userDoc = await db.collection('users').doc(currentUser.uid).get();
-      if (userDoc.exists && userDoc.data().phone) {
-        userPhone = userDoc.data().phone;
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        if (userData.phone) userPhone = userData.phone;
+        if (userData.name) sellerName = userData.name;
       }
       
-      // Upload image to Firebase Storage
+      // Convert image to Base64 for Firestore storage
       if (pendingImg instanceof File) {
-        const timestamp = Date.now();
-        const random = Math.random().toString(36).substr(2, 9);
-        const fileName = `listings/${currentUser.uid}/${timestamp}_${random}.jpg`;
-        const uploadTask = storage.ref(fileName).put(pendingImg);
-        
-        await new Promise((resolve, reject) => {
-          uploadTask.on('state_changed', 
-            () => {}, 
-            err => reject(err),
-            async () => {
-              imgUrl = await uploadTask.snapshot.ref.getDownloadURL();
-              resolve();
-            }
-          );
+        imgData = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = (e) => reject(new Error('Failed to read image'));
+          reader.readAsDataURL(pendingImg);
         });
       }
       
-      // Save listing to Firestore with storage URL
+      // Save listing to Firestore with Base64 image
+      showToast('info', 'Saving listing...');
       const docRef = await db.collection('listings').add({
         title: title,
         price: parseInt(price),
         cat: cat,
-        seller: seller,
+        seller: sellerName,
         sellerId: currentUser.uid,
         condition: cond,
         desc: desc || 'No description provided.',
         phone: userPhone || null,
-        img: imgUrl,
+        location: location,
+        img: imgData,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         views: 0,
         sold: false,
@@ -704,8 +728,10 @@ function postListing() {
       
       // Clear form
       pendingImg = null;
-      ['newTitle','newPrice','newDesc','newSeller'].forEach(id => document.getElementById(id).value = '');
+      ['newTitle','newPrice','newDesc'].forEach(id => document.getElementById(id).value = '');
       document.getElementById('newCondition').value = 'Brand New';
+      document.getElementById('newCat').value = 'Electronics';
+      document.getElementById('newLocation').value = 'On Campus';
       document.getElementById('fileInput').value = '';
       document.getElementById('uploadZone').style.display = 'block';
       document.getElementById('imagePreview').style.display = 'none';
@@ -714,11 +740,7 @@ function postListing() {
       showToast('check_circle','Your listing is live!');
     } catch (error) {
       console.error('Post listing error:', error);
-      if (error.code === 'permission-denied') {
-        showToast('error', 'Listing blocked: Firestore rules not set. Check Firebase Console.');
-      } else {
-        showToast('error', 'Failed to post listing: ' + error.message);
-      }
+      showToast('error', 'Failed to post: ' + error.message);
     }
   })();
 }
@@ -729,12 +751,79 @@ function toggleWish(e, id) {
   const btn = document.getElementById(`wish-${id}`);
   const icon = btn.querySelector('.material-icons-round');
   if (wishlist.has(id)) {
-    wishlist.delete(id); icon.textContent = 'favorite_border'; btn.classList.remove('liked');
+    wishlist.delete(id); 
+    icon.textContent = 'favorite_border'; 
+    btn.classList.remove('liked');
     showToast('favorite_border','Removed from saved');
   } else {
-    wishlist.add(id); icon.textContent = 'favorite'; btn.classList.add('liked');
+    wishlist.add(id); 
+    icon.textContent = 'favorite'; 
+    btn.classList.add('liked');
     showToast('favorite','Saved to wishlist');
   }
+  saveWishlist(); // Persist to localStorage
+}
+
+// ── SAVED ITEMS ──
+function renderSavedItems() {
+  const container = document.getElementById('savedItemsContainer');
+  
+  if (wishlist.size === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 60px 20px; color: var(--ink3);">
+        <div style="font-size: 56px; margin-bottom: 16px;">❤️</div>
+        <h3 style="color: var(--ink); font-size: 1.15rem; margin-bottom: 8px; font-weight: 600;">No saved items yet</h3>
+        <p style="font-size: 0.9rem; margin-bottom: 24px; line-height: 1.5;">Start saving items by clicking the heart icon on listings</p>
+        <button class="btn btn-primary" onclick="closeOverlay('savedOverlay'); document.getElementById('listings').scrollIntoView({behavior:'smooth'})">
+          <span class="material-icons-round" style="font-size:16px">apps</span>Browse Listings
+        </button>
+      </div>
+    `;
+    return;
+  }
+  
+  // Get saved items from listings array
+  const savedItems = listings.filter(l => wishlist.has(l.id));
+  
+  if (savedItems.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 40px 20px; color: var(--ink3);">
+        <p>Your saved items are loading...</p>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = savedItems.map((l, i) => {
+    const col = COLORS[l.id % COLORS.length];
+    const init = (l.seller || '').split(' ').filter(w=>w).map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const titleSafe = (l.title||'').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const catIcon = CAT_ICONS[l.cat] || 'category';
+    
+    const imgEl = l.img
+      ? `<img src="${l.img}" alt="${titleSafe}">`
+      : `<span class="material-icons-round">${catIcon}</span>`;
+    
+    return `
+      <div class="card" data-listing-id="${l.id}" onclick="closeOverlay('savedOverlay'); openDetail(this.getAttribute('data-listing-id'))" style="animation-delay:${i * 0.055}s; cursor: pointer;">
+        <div class="card-img">
+          ${imgEl}
+          <div class="badge-row">
+            <span class="badge badge-cat">${l.cat}</span>
+            <button class="wish-btn liked" id="wish-${l.id}" data-listing-id="${l.id}" onclick="event.stopPropagation(); toggleWish(event, this.getAttribute('data-listing-id')); renderSavedItems();">
+              <span class="material-icons-round">favorite</span>
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-title">${titleSafe}</div>
+          <div class="card-footer">
+            <div class="card-price">₦${Number(l.price).toLocaleString()}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 // ── MESSAGING ──
@@ -997,16 +1086,14 @@ async function saveProfileChanges() {
   try {
     let profilePicUrl = null;
     
-    // Upload picture if selected
+    // Convert profile picture to Base64 if selected
     if (pendingProfilePic) {
-      const timestamp = Date.now();
-      const fileName = `users/${currentUser.uid}/profile_${timestamp}.jpg`;
-      
-      // Upload to storage
-      await storage.ref(fileName).put(pendingProfilePic);
-      
-      // Get download URL
-      profilePicUrl = await storage.ref(fileName).getDownloadURL();
+      profilePicUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = (e) => reject(new Error('Failed to read image'));
+        reader.readAsDataURL(pendingProfilePic);
+      });
     }
     
     // Update Firestore user document
