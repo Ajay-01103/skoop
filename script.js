@@ -271,7 +271,14 @@ loadWishlist();
 // Load all public listings from Firestore (real-time)
 let listingsUnsubscribe = null;
 
+// Debounce mechanism for loadAllListings
+let loadListingsTimeout = null;
+let listingsFallbackTimeout = null;
+
 async function loadAllListings() {
+  // Debounce rapid calls (e.g., during logout/login)
+  clearTimeout(loadListingsTimeout);
+  
   // Require authentication to view listings
   if (!currentUser) {
     listings = [];
@@ -284,37 +291,59 @@ async function loadAllListings() {
     return;
   }
   
-  // Stop previous listener if exists
-  if (listingsUnsubscribe) listingsUnsubscribe();
-  
-  try {
-    // Real-time listener for listings
-    listingsUnsubscribe = db.collection('listings')
-      .where('sold', '==', false)
-      .orderBy('createdAt', 'desc')
-      .onSnapshot(querySnapshot => {
-        listings = querySnapshot.docs.map(doc => ({
-          ...doc.data(),
-          id: doc.id,
-          price: parseInt(doc.data().price)
-        }));
-        
-        // If no listings from Firebase, use fallback
+  // Add small delay to ensure auth is fully initialized
+  loadListingsTimeout = setTimeout(() => {
+    // Stop previous listener if exists
+    if (listingsUnsubscribe) listingsUnsubscribe();
+    
+    // Clear fallback timeout
+    clearTimeout(listingsFallbackTimeout);
+    
+    try {
+      // Set a fallback timeout - if listener doesn't respond in 3 seconds, show fallback
+      listingsFallbackTimeout = setTimeout(() => {
+        console.warn('Listener timeout, showing fallback data');
         if (listings.length === 0) {
           listings = fallbackListings;
+          renderListings();
         }
-        renderListings();
-      }, error => {
-        console.error('Real-time listener error:', error);
-        // Use fallback listings immediately on error
-        listings = fallbackListings;
-        renderListings();
-      });
-  } catch (error) {
-    console.log('Error setting up real-time listener:', error);
-    listings = fallbackListings;
-    renderListings();
-  }
+      }, 3000);
+      
+      // Real-time listener for listings
+      listingsUnsubscribe = db.collection('listings')
+        .where('sold', '==', false)
+        .orderBy('createdAt', 'desc')
+        .onSnapshot(querySnapshot => {
+          // Clear the fallback timeout since we got data
+          clearTimeout(listingsFallbackTimeout);
+          
+          listings = querySnapshot.docs.map(doc => ({
+            ...doc.data(),
+            id: doc.id,
+            price: parseInt(doc.data().price)
+          }));
+          
+          console.log(`Loaded ${listings.length} listings from Firestore`);
+          
+          // If no listings from Firebase, use fallback
+          if (listings.length === 0) {
+            listings = fallbackListings;
+          }
+          renderListings();
+        }, error => {
+          console.error('Real-time listener error:', error);
+          clearTimeout(listingsFallbackTimeout);
+          // Use fallback listings immediately on error
+          listings = fallbackListings;
+          renderListings();
+        });
+    } catch (error) {
+      console.error('Error setting up real-time listener:', error);
+      clearTimeout(listingsFallbackTimeout);
+      listings = fallbackListings;
+      renderListings();
+    }
+  }, 300); // 300ms delay to ensure auth state is stable
 }
 
 // Fallback local data
