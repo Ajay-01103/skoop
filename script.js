@@ -17,7 +17,7 @@ const storage = firebase.storage();
 // ║ FIREBASE SECURITY RULES SETUP (ACTIVE IN PRODUCTION)           ║
 // ╚════════════════════════════════════════════════════════════════╝
 // 
-// ✅ FIRESTORE RULES - Already configured in Firebase Console
+// ── FIRESTORE RULES - Already configured in Firebase Console
 //    Your current rules allow:
 //    - Public listing reads
 //    - Auth users can create listings
@@ -25,7 +25,7 @@ const storage = firebase.storage();
 //    - Users can read all profiles, write own profile
 //    - Only conversation participants can read/write messages
 //
-// ⚠️ STORAGE RULES - Go to Firebase Console > Storage > Rules
+// STORAGE RULES - Go to Firebase Console > Storage > Rules
 //    Copy & paste (if not already configured):
 //    
 //    rules_version = '2';
@@ -256,7 +256,7 @@ function saveWishlist() {
 // Load wishlist on startup
 loadWishlist();
 
-// ⚠️ FIREBASE STORAGE SECURITY RULES (Add to Firebase Console):
+// FIREBASE STORAGE SECURITY RULES (Add to Firebase Console):
 // rules_version = '2';
 // service firebase.storage {
 //   match /b/{bucket}/o {
@@ -272,6 +272,18 @@ loadWishlist();
 let listingsUnsubscribe = null;
 
 async function loadAllListings() {
+  // Require authentication to view listings
+  if (!currentUser) {
+    listings = [];
+    renderListings();
+    // Show login overlay after a short delay to ensure DOM is ready
+    setTimeout(() => {
+      showToast('warning', 'Sign in to browse listings');
+      openOverlay('loginOverlay');
+    }, 500);
+    return;
+  }
+  
   // Stop previous listener if exists
   if (listingsUnsubscribe) listingsUnsubscribe();
   
@@ -331,6 +343,20 @@ function getFiltered() {
 function renderListings() {
   const data = getFiltered();
   const grid = document.getElementById('listingsGrid');
+  
+  // Check if user is authenticated
+  if (!currentUser) {
+    grid.innerHTML = `<div class="empty">
+      <div class="empty-icon"><span class="material-icons-round">lock</span></div>
+      <h3>Sign in to browse listings</h3>
+      <p>Create an account or log in to see available items on campus</p>
+      <button class="btn btn-primary" onclick="openOverlay('loginOverlay')" style="margin-top: 16px;">
+        <span class="material-icons-round">login</span>Sign In
+      </button>
+    </div>`;
+    document.getElementById('paginationControls').innerHTML = '';
+    return;
+  }
   
   // Calculate pagination
   const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
@@ -771,7 +797,7 @@ function renderSavedItems() {
   if (wishlist.size === 0) {
     container.innerHTML = `
       <div style="text-align: center; padding: 60px 20px; color: var(--ink3);">
-        <div style="font-size: 56px; margin-bottom: 16px;">❤️</div>
+        <div style="font-size: 56px; margin-bottom: 16px;"><span class="material-icons-round" style="font-size: 64px; color: var(--accent);">favorite</span></div>
         <h3 style="color: var(--ink); font-size: 1.15rem; margin-bottom: 8px; font-weight: 600;">No saved items yet</h3>
         <p style="font-size: 0.9rem; margin-bottom: 24px; line-height: 1.5;">Start saving items by clicking the heart icon on listings</p>
         <button class="btn btn-primary" onclick="closeOverlay('savedOverlay'); document.getElementById('listings').scrollIntoView({behavior:'smooth'})">
@@ -1426,6 +1452,8 @@ firebase.auth().onAuthStateChanged(user => {
   currentUser = user;
   authReady = true;
   updateAuthUI();
+  // Always reload public listings when auth state changes
+  loadAllListings();
   if (user) {
     loadUserListings();
   }
