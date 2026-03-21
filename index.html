@@ -37,11 +37,14 @@
         <span id="userEmail" style="font-size:0.85rem; color:var(--ink3)"></span>
         <button class="icon-btn" onclick="loadAndShowMessages()" title="Messages" style="position:relative;">
           <span class="material-icons-round">mail</span>
-          <span id="msgBadge" style="position:absolute; top:-6px; right:-6px; background:var(--primary); color:white; border-radius:50%; width:16px; height:16px; font-size:0.65rem; display:none; align-items:center; justify-content:center; font-weight:600;">0</span>
+          <span id="msgBadge" style="position:absolute; top:-6px; right:-6px; background:var(--accent); color:white; border-radius:50%; width:20px; height:20px; font-size:0.5rem; display:none; align-items:center; justify-content:center; font-weight:700; min-width:20px; min-height:20px;">0</span>
         </button>
         <button class="icon-btn" onclick="loadNotifications()" title="Notifications" style="position:relative;">
           <span class="material-icons-round">notifications</span>
           <span id="notifBadge" style="position:absolute; top:-6px; right:-6px; background:#e74c3c; color:white; border-radius:50%; width:16px; height:16px; font-size:0.65rem; display:none; align-items:center; justify-content:center; font-weight:600;">0</span>
+        </button>
+        <button id="desktopProfileBtn" class="icon-btn" onclick="loadAndShowProfile()" title="Profile" style="position:relative;">
+          <span class="material-icons-round">person</span>
         </button>
       </div>
     </div>
@@ -55,7 +58,7 @@
       <span class="material-icons-round">school</span>Student Marketplace
     </div>
     <h1>Buy &amp; sell anything on <em>campus</em></h1>
-    <p>From textbooks to laptops, food businesses to freelance services — your school's free marketplace. No fees, no middlemen.</p>
+    <p>Buying from a stranger online is a gamble. Buying from a coursemate on campus isn't. Skoop is Unilorin's own marketplace, built so students can trade with people they can actually meet up with.</p>
     <div class="hero-cta">
       <button class="btn btn-primary" onclick="openOverlay('postOverlay')">
         <span class="material-icons-round" style="font-size:16px">add_circle_outline</span>Start selling

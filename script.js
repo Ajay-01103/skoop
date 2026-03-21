@@ -17,13 +17,64 @@ const storage = firebase.storage();
 // ║ FIREBASE SECURITY RULES SETUP (ACTIVE IN PRODUCTION)           ║
 // ╚════════════════════════════════════════════════════════════════╝
 // 
-// ── FIRESTORE RULES - Already configured in Firebase Console
-//    Your current rules allow:
-//    - Public listing reads
-//    - Auth users can create listings
-//    - Only seller can update/delete own listing
-//    - Users can read all profiles, write own profile
-//    - Only conversation participants can read/write messages
+// ── FIRESTORE RULES - MUST be set in Firebase Console
+//    Go to: Firebase Console > Firestore > Rules tab
+//    Clear existing rules and paste ONLY the text below (without the // comments):
+//
+//    rules_version = '2';
+//    service cloud.firestore {
+//      match /databases/{database}/documents {
+//        // Listings - publicly readable, only seller can modify
+//        match /listings/{listingId} {
+//          allow read: if true;
+//          allow create: if request.auth != null;
+//          allow update,delete: if request.auth.uid == resource.data.sellerId;
+//        }
+//        // User profiles - publicly readable, only owner can write
+//        match /users/{userId} {
+//          allow read: if true;
+//          allow write: if request.auth.uid == userId;
+//        }
+//        // Conversations - any authenticated user can read all, only participants can update
+//        match /conversations/{conversationId} {
+//          allow read: if request.auth != null;
+//          allow create: if request.auth != null;
+//          allow update,delete: if request.auth.uid in resource.data.participants;
+//          // Messages - any authenticated user can read, only sender can create
+//          match /messages/{messageId} {
+//            allow read: if request.auth != null;
+//            allow create: if request.auth.uid == request.resource.data.senderId;
+//          }
+//        }
+//      }
+//    }
+//
+// EXACT RULES TO COPY (paste this entire block into Firebase Console - remove this comment line first):
+/*
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /listings/{listingId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update,delete: if request.auth.uid == resource.data.sellerId;
+    }
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if request.auth.uid == userId;
+    }
+    match /conversations/{conversationId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update,delete: if request.auth.uid in resource.data.participants;
+      match /messages/{messageId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth.uid == request.resource.data.senderId;
+      }
+    }
+  }
+}
+*/
 //
 // STORAGE RULES - Go to Firebase Console > Storage > Rules
 //    Copy & paste (if not already configured):
@@ -158,7 +209,7 @@ async function handleSignup() {
   } catch (error) {
     console.error('Signup error:', error);
     if (error.code === 'permission-denied') {
-      showToast('error', 'Signup blocked: Firestore rules not set. Check Firebase Console.');
+      showToast('error', 'Signup error');
     } else {
       showToast('error', error.message);
     }
@@ -613,13 +664,15 @@ function openDetail(id) {
       </div>
       
       ${!isOwnListing ? `
-      <div style="display:flex; gap:10px; margin-bottom:16px;">
-        <button class="btn btn-primary" style="flex:1;" data-listing-id="${l.id}" data-seller-id="${l.sellerId}" data-seller-name="${sellerEsc}" onclick="openChatFromButton(this)">
-          <span class="material-icons-round" style="font-size:16px">chat</span>Message
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+        <button class="btn btn-primary btn-full action-btn" data-listing-id="${l.id}" data-seller-id="${l.sellerId}" data-seller-name="${sellerEsc}" onclick="openChatFromButton(this)" style="padding:16px 8px; flex-direction:column; justify-content:center; min-height:100px; border-radius:12px; box-shadow:0 4px 16px rgba(144, 42, 212, 0.15); transition:all 0.3s;">
+          <span class="material-icons-round" style="font-size:32px; margin-bottom:8px;">chat_bubble_outline</span>
+          <span style="font-size:0.9rem; font-weight:600;">Message</span>
         </button>
         ${waLink ? `
-        <a href="${waLink}" target="_blank" class="btn btn-outline" style="flex:1; text-decoration:none;">
-          <span class="material-icons-round" style="font-size:16px">whatsapp</span>WhatsApp
+        <a href="${waLink}" target="_blank" class="btn btn-primary btn-full action-btn" style="text-decoration:none; padding:16px 8px; flex-direction:column; justify-content:center; min-height:100px; border-radius:12px; box-shadow:0 4px 16px rgba(144, 42, 212, 0.15); transition:all 0.3s;">
+          <span class="material-icons-round" style="font-size:32px; margin-bottom:8px;">call</span>
+          <span style="font-size:0.9rem; font-weight:600;">WhatsApp</span>
         </a>
         ` : ''}
       </div>
@@ -697,7 +750,7 @@ function handleImg(e) {
         document.getElementById('uploadZone').style.display = 'none';
         document.getElementById('imagePreview').style.display = 'block';
         document.getElementById('previewImg').src = ev.target.result;
-        showToast('check_circle', 'Sharp Joor! (compressed)');
+        showToast('check_circle', 'Sharp Joor!');
       };
       reader.readAsDataURL(compressedFile);
     });
@@ -908,6 +961,53 @@ async function waitForAuth() {
   });
 }
 
+// ── MESSAGES ──
+let unreadCountListener = null;
+
+function updateUnreadBadge() {
+  if (!currentUser) {
+    document.getElementById('msgBadge').style.display = 'none';
+    return;
+  }
+  
+  const badge = document.getElementById('msgBadge');
+  
+  // Real-time listener for unread message count
+  if (unreadCountListener) unreadCountListener();
+  
+  try {
+    // First get all user's conversations
+    unreadCountListener = db.collection('conversations')
+      .where('participants', 'array-contains', currentUser.uid)
+      .onSnapshot(snapshot => {
+        let unreadCount = 0;
+        
+        // Count conversations where current user is in unreadBy array
+        snapshot.docs.forEach(doc => {
+          const conv = doc.data();
+          if (Array.isArray(conv.unreadBy) && conv.unreadBy.includes(currentUser.uid)) {
+            unreadCount++;
+          }
+        });
+        
+        console.log(`[DEBUG] Unread messages: ${unreadCount}`);
+        
+        // Update nav badge
+        if (unreadCount > 0) {
+          badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
+          badge.style.display = 'inline-flex';
+        } else {
+          badge.style.display = 'none';
+        }
+      }, error => {
+        console.error('[ERROR] Unread count listener:', error);
+        badge.style.display = 'none';
+      });
+  } catch (error) {
+    console.error('[ERROR] Setting up unread badge:', error);
+  }
+}
+
 async function loadAndShowMessages() {
   if (!currentUser) {
     showToast('warning', 'Please sign in to view messages');
@@ -940,17 +1040,24 @@ async function loadAndShowMessages() {
         const time = conv.lastMessageTime ? new Date(conv.lastMessageTime.toDate()).toLocaleString() : '';
         const preview = (conv.lastMessage || 'No messages yet').substring(0, 50) + 
                        (conv.lastMessage && conv.lastMessage.length > 50 ? '...' : '');
+        const isUnread = conv.unread === true || (Array.isArray(conv.unreadBy) && conv.unreadBy.includes(currentUser.uid));
+        const unreadBadgeColor = isUnread ? 'var(--accent)' : 'transparent';
+        const unreadFontWeight = isUnread ? '600' : '500';
+        const unreadBackground = isUnread ? 'rgba(127, 61, 255, 0.1)' : 'transparent';
         
         return `
           <div style="
-            padding:12px; background:var(--surface); border-radius:var(--radius-sm);
+            padding:12px; background:${unreadBackground}; border-radius:var(--radius-sm);
             border:1px solid var(--border); cursor:pointer; transition:all 0.2s;
           " onclick="openChatFromConversation('${doc.id}', '${otherUserId}', '${conv.sellerName || 'User'}')">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
-              <div style="font-weight:500; color:var(--ink);">${conv.sellerName || 'User'}</div>
+              <div style="display:flex; align-items:center; gap:8px; flex:1;">
+                <div style="font-weight:${unreadFontWeight}; color:var(--ink);">${conv.sellerName || 'User'}</div>
+                ${isUnread ? '<span style="width:8px; height:8px; background:var(--accent); border-radius:50%; flex-shrink:0;"></span>' : ''}
+              </div>
               <div style="font-size:0.75rem; color:var(--ink3);">${time}</div>
             </div>
-            <div style="font-size:0.9rem; color:var(--ink2);">${preview}</div>
+            <div style="font-size:0.9rem; color:var(--ink2); font-weight:${isUnread ? '500' : '400'};">${preview}</div>
           </div>
         `;
       }).join('');
@@ -968,6 +1075,12 @@ async function loadAndShowMessages() {
 function openChatFromConversation(chatId, otherUserId, sellerName) {
   currentChatId = chatId;
   document.getElementById('chatTitle').textContent = `Chat with ${sellerName || 'User'}`;
+  
+  // Mark conversation as read for current user
+  db.collection('conversations').doc(chatId).update({
+    unreadBy: firebase.firestore.FieldValue.arrayRemove(currentUser.uid)
+  }).catch(err => console.log('Mark as read error:', err));
+  
   loadMessages(currentChatId);
   closeOverlay('messagesOverlay');
   openOverlay('chatOverlay');
@@ -1274,14 +1387,18 @@ async function openChat(listingId, sellerId, sellerName) {
     currentChatId = generateConversationId(currentUser.uid, sellerId);
     document.getElementById('chatTitle').textContent = `Chat with ${sellerName || 'Seller'}`;
     
-    // Create/update conversation metadata
-    await db.collection('conversations').doc(currentChatId).set({
+    // Create/update conversation metadata with proper write permissions
+    const conversationData = {
       participants: [currentUser.uid, sellerId],
       listingId: listingId,
       lastMessage: '',
       lastMessageTime: firebase.firestore.FieldValue.serverTimestamp(),
-      sellerName: sellerName
-    }, { merge: true });
+      sellerName: sellerName,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      unreadBy: []
+    };
+    
+    await db.collection('conversations').doc(currentChatId).set(conversationData, { merge: true });
     
     // Load and listen to messages
     loadMessages(currentChatId);
@@ -1291,9 +1408,9 @@ async function openChat(listingId, sellerId, sellerName) {
   } catch (error) {
     console.error('OpenChat error:', error);
     if (error.code === 'permission-denied') {
-      showToast('error', 'Chat permission denied. Set Firestore rules in Firebase Console.');
+      showToast('error', 'Unable to start chat right now. Please try again later.');
     } else {
-      showToast('error', 'Chat error: ' + error.message);
+      showToast('error', 'Could not start chat. Please try again.');
     }
   }
 }
@@ -1320,19 +1437,32 @@ function openChatFromButton(btn) {
 function loadMessages(chatId) {
   if (messagesUnsubscribe) messagesUnsubscribe();
   
+  const messagesEl = document.getElementById('messagesContainer');
+  if (messagesEl) messagesEl.innerHTML = '<div style="text-align:center; padding:20px; color:var(--ink3);">No messages yet. Say hello!</div>';
+  
   try {
     messagesUnsubscribe = db.collection('conversations').doc(chatId)
       .collection('messages')
       .orderBy('createdAt', 'asc')
       .onSnapshot(querySnapshot => {
-        renderMessages(querySnapshot.docs);
+        if (querySnapshot.empty) {
+          if (messagesEl) messagesEl.innerHTML = '<div style="text-align:center; padding:20px; color:var(--ink3);">No messages yet. Say hello!</div>';
+        } else {
+          renderMessages(querySnapshot.docs);
+        }
       }, error => {
         console.error('Message listener error:', error);
-        showToast('error', 'Could not load messages: ' + error.message);
+        // For new conversations, the collection might not exist - that's OK
+        if (error.code === 'failed-precondition' || error.code === 'permission-denied') {
+          if (messagesEl) messagesEl.innerHTML = '<div style="text-align:center; padding:20px; color:var(--ink3);">Ready to chat. Send your first message!</div>';
+        } else {
+          showToast('error', 'Could not load messages: ' + error.message);
+        }
       });
   } catch (err) {
     console.error('Error setting up message listener:', err);
-    showToast('error', 'Chat setup failed');
+    // Don't show error toast for new conversations - they won't have documents yet
+    if (messagesEl) messagesEl.innerHTML = '<div style="text-align:center; padding:20px; color:var(--ink3);">Ready to chat. Send your first message!</div>';
   }
 }
 
@@ -1380,6 +1510,17 @@ async function sendMessage() {
   }
   
   try {
+    // Get conversation data to find other participant
+    const convDoc = await db.collection('conversations').doc(currentChatId).get();
+    if (!convDoc.exists) {
+      showToast('error', 'Conversation not found');
+      return;
+    }
+    
+    const conv = convDoc.data();
+    const otherUserId = conv.participants.find(pid => pid !== currentUser.uid);
+    
+    // Add message
     await db.collection('conversations').doc(currentChatId)
       .collection('messages').add({
         senderId: currentUser.uid,
@@ -1387,19 +1528,25 @@ async function sendMessage() {
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
     
-    // Update conversation lastMessage
+    // Update conversation - set other user as unread
     await db.collection('conversations').doc(currentChatId).update({
       lastMessage: text,
-      lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
+      lastMessageTime: firebase.firestore.FieldValue.serverTimestamp(),
+      unreadBy: [otherUserId]  // Simple array with just the other user
     });
+    
+    // Update badge if visible
+    updateUnreadBadge();
     
     input.value = '';
   } catch (error) {
     console.error('Send message error:', error);
     if (error.code === 'permission-denied') {
-      showToast('error', 'Chat blocked: Firestore rules not set. Check Firebase Console.');
+      showToast('error', 'Unable to send message. Please try again.');
+    } else if (error.code === 'not-found') {
+      showToast('error', 'Conversation not found. Please refresh and try again.');
     } else {
-      showToast('error', 'Failed to send message: ' + (error.message || 'unknown error'));
+      showToast('error', 'Could not send message. Please try again.');
     }
   }
 }
@@ -1485,5 +1632,9 @@ firebase.auth().onAuthStateChanged(user => {
   loadAllListings();
   if (user) {
     loadUserListings();
+    updateUnreadBadge();  // Show unread message badge when logged in
+  } else {
+    document.getElementById('msgBadge').style.display = 'none';  // Hide badge when logged out
+    if (unreadCountListener) unreadCountListener();  // Stop listening
   }
 });
