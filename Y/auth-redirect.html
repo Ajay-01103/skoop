@@ -7,6 +7,17 @@
   <link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,600&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <style>
+    :root {
+      --primary: #7F3DFF;
+      --primary-dark: #6d2de0;
+      --bg: #F9F9F9;
+      --text-dark: #1C1C1E;
+      --text-muted: #8E8E93;
+      --error: #e74c3c;
+      --success: #2a6b3d;
+      --white: #ffffff;
+    }
+    
     * {
       margin: 0;
       padding: 0;
@@ -14,34 +25,95 @@
     }
     
     body {
-      font-family: 'Bricolage Grotesque', sans-serif;
-      background: linear-gradient(135deg, #f9f9f9 0%, #f5f5f5 100%);
+      font-family: 'Bricolage Grotesque', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
       display: flex;
       align-items: center;
       justify-content: center;
       min-height: 100vh;
       padding: 20px;
+      color: var(--text-dark);
+    }
+    
+    .wrapper {
+      width: 100%;
+      max-width: 420px;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    
+    .header-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--text-dark);
+    }
+    
+    .header-logo span {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--primary);
+      border-radius: 8px;
+      color: var(--white);
+      font-size: 18px;
     }
     
     .container {
-      background: white;
-      border-radius: 16px;
-      padding: 40px;
-      max-width: 400px;
-      width: 100%;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
-      text-align: center;
+      background: var(--white);
+      border-radius: 12px;
+      padding: 48px 32px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+      animation: slideUp 0.4s ease-out;
+    }
+    
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
     
     .icon {
-      font-size: 64px;
-      margin-bottom: 20px;
+      font-size: 56px;
+      margin-bottom: 24px;
       display: inline-block;
-      color: #7F3DFF;
+      color: var(--primary);
+      animation: iconPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    
+    @keyframes iconPop {
+      0% {
+        transform: scale(0);
+        opacity: 0;
+      }
+      50% {
+        transform: scale(1.1);
+      }
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+    
+    .icon.success {
+      color: var(--success);
     }
     
     .icon.error {
-      color: #e74c3c;
+      color: var(--error);
     }
     
     .icon.warning {
@@ -49,28 +121,33 @@
     }
     
     h1 {
-      font-size: 24px;
-      color: #1C1C1E;
+      font-size: 28px;
+      color: var(--text-dark);
       margin-bottom: 12px;
-      font-weight: 600;
+      font-weight: 700;
+      letter-spacing: -0.5px;
     }
     
-    p {
-      color: #8E8E93;
+    .subtitle {
+      color: var(--text-muted);
       font-size: 14px;
+      margin-bottom: 28px;
       line-height: 1.6;
-      margin-bottom: 24px;
+    }
+    
+    .spinner-wrapper {
+      text-align: center;
+      margin: 24px 0;
     }
     
     .loader {
       display: inline-block;
-      width: 30px;
-      height: 30px;
-      border: 3px solid #f3f3f3;
-      border-top: 3px solid #7F3DFF;
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(127, 61, 255, 0.1);
+      border-top: 3px solid var(--primary);
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
-      margin: 20px 0;
     }
     
     @keyframes spin {
@@ -78,62 +155,130 @@
       100% { transform: rotate(360deg); }
     }
     
+    .form-group {
+      margin-bottom: 16px;
+    }
+    
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-dark);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .form-group input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 14px;
+      color: var(--text-dark);
+      transition: all 0.2s;
+      background: var(--white);
+    }
+    
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(127, 61, 255, 0.1);
+    }
+    
+    .form-group input::placeholder {
+      color: var(--text-muted);
+    }
+    
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 28px;
+    }
+    
     .btn {
       display: inline-block;
       padding: 12px 24px;
-      background: #7F3DFF;
-      color: white;
+      background: var(--primary);
+      color: var(--white);
       border: none;
       border-radius: 8px;
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
       text-decoration: none;
-      transition: background 0.2s;
-      margin-top: 20px;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     
     .btn:hover {
-      background: #6d2de0;
+      background: var(--primary-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(127, 61, 255, 0.3);
+    }
+    
+    .btn:active {
+      transform: translateY(0);
     }
     
     .btn.secondary {
-      background: #F9F9F9;
-      color: #7F3DFF;
-      border: 2px solid #7F3DFF;
+      background: var(--white);
+      color: var(--primary);
+      border: 1.5px solid var(--primary);
     }
     
     .btn.secondary:hover {
-      background: #f0f0f0;
+      background: rgba(127, 61, 255, 0.05);
+      box-shadow: 0 2px 8px rgba(127, 61, 255, 0.15);
     }
     
-    .btn-group {
-      display: flex;
-      gap: 12px;
-      margin-top: 20px;
-    }
-    
-    .btn-group .btn {
-      flex: 1;
-      margin: 0;
-    }
-    
-    code {
-      background: #f5f5f5;
-      padding: 4px 8px;
+    .error-detail {
+      background: rgba(231, 76, 60, 0.05);
+      border-left: 3px solid var(--error);
+      padding: 12px;
       border-radius: 4px;
-      font-family: monospace;
+      margin-top: 12px;
       font-size: 12px;
-      color: #1C1C1E;
+      color: #c0392b;
+      font-family: 'Monaco', monospace;
+      text-align: left;
+      word-break: break-all;
+    }
+    
+    .success-message {
+      background: rgba(42, 107, 61, 0.05);
+      border-left: 3px solid var(--success);
+      padding: 12px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: var(--text-dark);
     }
   </style>
 </head>
 <body>
-  <div class="container" id="container">
-    <span class="material-icons-round icon">hourglass_empty</span>
-    <h1>Processing...</h1>
-    <p>Please wait while we complete your request.</p>
-    <div class="loader"></div>
+  <div class="wrapper">
+    <div class="header">
+      <div class="header-logo">
+        <span class="material-icons-round">storefront</span>
+        Skoop
+      </div>
+    </div>
+    <div class="container" id="container">
+      <span class="material-icons-round icon">hourglass_empty</span>
+      <h1>Processing...</h1>
+      <p class="subtitle">Please wait while we complete your request.</p>
+      <div class="spinner-wrapper">
+        <div class="loader"></div>
+      </div>
+    </div>
   </div>
 
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
@@ -156,9 +301,12 @@
 
     // Get query parameters
     const params = new URLSearchParams(window.location.search);
-    const mode = params.get('mode');
-    const oobCode = params.get('oobCode');
+    let mode = params.get('mode');
+    let oobCode = params.get('oobCode');
     const apiKey = params.get('apiKey');
+
+    // Debug: Log what we're receiving
+    console.log('Auth Redirect - Mode:', mode, 'Code:', oobCode ? 'Present' : 'Missing');
 
     async function handleAuthAction() {
       const container = document.getElementById('container');
@@ -186,10 +334,15 @@
           }
           
           container.innerHTML = `
-            <span class="material-icons-round icon">check_circle</span>
-            <h1>Email Verified!</h1>
-            <p>Your email has been successfully verified. You can now use all features of Skoop as a verified seller.</p>
-            <button class="btn" onclick="redirectHome()">Go to Skoop</button>
+            <span class="material-icons-round icon success">check_circle</span>
+            <h1>Email Verified! ✓</h1>
+            <p class="subtitle">Your email has been successfully verified. You can now use all features of Skoop as a verified seller.</p>
+            <div class="success-message">
+              You're all set and ready to start selling on Skoop!
+            </div>
+            <div class="btn-group">
+              <button class="btn" onclick="redirectHome()">Go to Skoop</button>
+            </div>
           `;
         } 
         else if (mode === 'resetPassword') {
@@ -198,14 +351,20 @@
           await auth.verifyPasswordResetCode(oobCode);
           container.innerHTML = `
             <span class="material-icons-round icon">vpn_key</span>
-            <h1>Reset Your Password</h1>
-            <p>Enter your new password below.</p>
-            <div style="margin: 20px 0; text-align: left;">
-              <input type="password" id="newPassword" placeholder="New password (min 6 chars)" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:8px; font-family: inherit; margin-bottom:10px;">
-              <input type="password" id="confirmPassword" placeholder="Confirm password" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:8px; font-family: inherit;">
+            <h1>Reset Password</h1>
+            <p class="subtitle">Enter your new password below.</p>
+            <div class="form-group">
+              <label>New Password</label>
+              <input type="password" id="newPassword" placeholder="Minimum 6 characters" autocomplete="new-password">
             </div>
-            <button class="btn" onclick="resetPassword('${oobCode}')">Update Password</button>
-            <button class="btn secondary" onclick="redirectHome()">Back Home</button>
+            <div class="form-group">
+              <label>Confirm Password</label>
+              <input type="password" id="confirmPassword" placeholder="Re-enter your password" autocomplete="new-password">
+            </div>
+            <div class="btn-group">
+              <button class="btn" onclick="resetPassword('${oobCode}')">Update Password</button>
+              <button class="btn secondary" onclick="redirectHome()">Cancel</button>
+            </div>
           `;
         } 
         else {
@@ -216,18 +375,26 @@
         let errorMsg = 'Something went wrong';
         
         if (error.code === 'auth/invalid-action-code' || error.code === 'auth/expired-action-code') {
-          errorMsg = 'This link has expired. Please request a new one.';
+          errorMsg = 'This link has expired or is invalid. Please request a new one.';
         } else if (error.code === 'auth/invalid-oob-code') {
           errorMsg = 'Invalid link. Please request a new one.';
         } else if (error.message === 'Invalid auth link') {
-          errorMsg = 'Invalid auth link';
+          errorMsg = 'Invalid auth link. Please check your email for the correct link.';
+        } else if (error.message && error.message.includes('auth/invalid')) {
+          errorMsg = 'The authentication code is invalid. Please request a new link.';
         }
 
         container.innerHTML = `
           <span class="material-icons-round icon error">error_outline</span>
-          <h1>Oops!</h1>
-          <p>${errorMsg}</p>
-          <button class="btn" onclick="redirectHome()">Back Home</button>
+          <h1>Something Went Wrong</h1>
+          <p class="subtitle">${errorMsg}</p>
+          <div class="error-detail">
+            ${error.code || error.message}
+          </div>
+          <div class="btn-group" style="margin-top: 24px;">
+            <button class="btn secondary" onclick="window.location.reload()">Try Again</button>
+            <button class="btn" onclick="redirectHome()">Back Home</button>
+          </div>
         `;
       }
     }
@@ -256,26 +423,38 @@
         container.innerHTML = `
           <span class="material-icons-round icon">hourglass_empty</span>
           <h1>Updating...</h1>
-          <p>Please wait while we update your password.</p>
-          <div class="loader"></div>
+          <p class="subtitle">Please wait while we update your password.</p>
+          <div class="spinner-wrapper">
+            <div class="loader"></div>
+          </div>
         `;
 
         await auth.confirmPasswordReset(oobCode, newPassword);
 
         container.innerHTML = `
-          <span class="material-icons-round icon">check_circle</span>
-          <h1>Password Updated!</h1>
-          <p>Your password has been successfully reset. You can now sign in with your new password.</p>
-          <button class="btn" onclick="redirectHome()">Go to Skoop</button>
+          <span class="material-icons-round icon success">check_circle</span>
+          <h1>Password Updated! ✓</h1>
+          <p class="subtitle">Your password has been successfully reset. You can now sign in with your new password.</p>
+          <div class="success-message">
+            Return to Skoop and log in with your new password.
+          </div>
+          <div class="btn-group">
+            <button class="btn" onclick="redirectHome()">Go to Skoop</button>
+          </div>
         `;
       } catch (error) {
         console.error('Password reset error:', error);
         document.getElementById('container').innerHTML = `
           <span class="material-icons-round icon error">error_outline</span>
-          <h1>Error</h1>
-          <p>Failed to reset password. Please try again.</p>
-          <button class="btn" onclick="window.location.reload()">Retry</button>
-          <button class="btn secondary" onclick="redirectHome()">Back Home</button>
+          <h1>Reset Failed</h1>
+          <p class="subtitle">We couldn't update your password. Please try again.</p>
+          <div class="error-detail">
+            ${error.message || 'Unknown error'}
+          </div>
+          <div class="btn-group" style="margin-top: 24px;">
+            <button class="btn secondary" onclick="window.location.reload()">Try Again</button>
+            <button class="btn" onclick="redirectHome()">Back Home</button>
+          </div>
         `;
       }
     }

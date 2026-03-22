@@ -96,6 +96,16 @@ let pendingImg = null;
 let listings = [];
 let currentPage = 1;
 const ITEMS_PER_PAGE = 15;
+const NEW_BADGE_EXPIRY_DAYS = 7;
+
+// Helper: Check if listing is within 7 days (for "New" badge)
+function isListingNew(createdAt) {
+  if (!createdAt) return false;
+  const created = createdAt.toDate ? createdAt.toDate() : new Date(createdAt);
+  const ageMs = Date.now() - created.getTime();
+  const ageDays = ageMs / (1000 * 60 * 60 * 24);
+  return ageDays <= NEW_BADGE_EXPIRY_DAYS;
+}
 
 function updateAuthUI() {
   const authNav = document.getElementById('authNav');
@@ -159,6 +169,26 @@ function togglePasswordVisibility(inputId, btn) {
   }
 }
 
+// Error message mapper for friendly user feedback
+function getFriendlyErrorMessage(error) {
+  const code = error.code || '';
+  const errorMap = {
+    'auth/user-not-found': 'No account found with this email. Create one to get started!',
+    'auth/wrong-password': 'Password is incorrect. Try again or reset your password.',
+    'auth/invalid-email': 'Please enter a valid email address.',
+    'auth/user-disabled': 'This account has been disabled.',
+    'auth/too-many-requests': 'Too many login attempts. Try again later.',
+    'auth/email-already-in-use': 'This email is already registered. Try signing in instead.',
+    'auth/weak-password': 'Password is too weak. Use at least 6 characters.',
+    'auth/invalid-credential': 'Email or password is incorrect.',
+    'auth/operation-not-allowed': 'Sign-in is temporarily unavailable. Try again later.',
+    'auth/network-request-failed': 'Network error. Check your connection and try again.',
+    'auth/invalid-api-key': 'Configuration error. Please try again later.',
+  };
+  
+  return errorMap[code] || 'Something went wrong. Please try again.';
+}
+
 async function handleForgotPassword() {
   const email = document.getElementById('resetEmail').value.trim();
   
@@ -169,17 +199,14 @@ async function handleForgotPassword() {
   
   try {
     await firebase.auth().sendPasswordResetEmail(email, {
-      url: 'https://thisisskoop.firebaseapp.com/Y/auth-redirect.html'
+      url: 'https://thisisskoop.firebaseapp.com/Y/auth-redirect.html',
+      handleCodeInApp: true
     });
     showToast('check_circle', 'Password reset link sent to your email');
     document.getElementById('resetEmail').value = '';
     setTimeout(() => switchToLogin({preventDefault: () => {}}), 2000);
   } catch (error) {
-    if (error.code === 'auth/user-not-found') {
-      showToast('error', 'No account found with that email');
-    } else {
-      showToast('error', error.message);
-    }
+    showToast('error', getFriendlyErrorMessage(error));
   }
 }
 
@@ -199,7 +226,7 @@ async function handleLogin() {
     document.getElementById('loginEmail').value = '';
     document.getElementById('loginPassword').value = '';
   } catch (error) {
-    showToast('error', error.message);
+    showToast('error', getFriendlyErrorMessage(error));
   }
 }
 
@@ -224,7 +251,8 @@ async function handleSignup() {
     
     // Send verification email
     await result.user.sendEmailVerification({
-      url: 'https://thisisskoop.firebaseapp.com/Y/auth-redirect.html'
+      url: 'https://thisisskoop.firebaseapp.com/Y/auth-redirect.html',
+      handleCodeInApp: true
     });
     
     // Save user data to Firestore
@@ -248,11 +276,7 @@ async function handleSignup() {
     document.getElementById('signupPhone').value = '';
   } catch (error) {
     console.error('Signup error:', error);
-    if (error.code === 'permission-denied') {
-      showToast('error', 'Signup error');
-    } else {
-      showToast('error', error.message);
-    }
+    showToast('error', getFriendlyErrorMessage(error));
   }
 }
 
@@ -501,7 +525,7 @@ function renderListings() {
   grid.innerHTML = paginatedData.map((l, i) => {
     const col = COLORS[l.id % COLORS.length];
     const init = (l.seller || '').split(' ').filter(w=>w).map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    const isNew = l.condition === 'Brand New';
+    const isNew = l.condition === 'Brand New' && isListingNew(l.createdAt);
     const isSvc = l.cat === 'Services';
     const titleSafe = (l.title||'').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const sellerSafe = (l.seller||'').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -628,7 +652,7 @@ function renderMobileSearchResults() {
   container.innerHTML = data.map((l, i) => {
     const col = COLORS[l.id % COLORS.length];
     const init = (l.seller || '').split(' ').filter(w=>w).map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    const isNew = l.condition === 'Brand New';
+    const isNew = l.condition === 'Brand New' && isListingNew(l.createdAt);
     const isSvc = l.cat === 'Services';
     const titleSafe = (l.title||'').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const sellerSafe = (l.seller||'').replace(/</g, '&lt;').replace(/>/g, '&gt;');
