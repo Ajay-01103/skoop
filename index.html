@@ -212,6 +212,12 @@
         </select>
       </div>
       <div class="form-group">
+        <label>Negotiable?</label>
+        <select class="input" id="newNegotiable">
+          <option value="yes">Yes - Price negotiable</option><option value="no">No - Fixed price</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label>Photo *</label>
         <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()" style="cursor: pointer;">
           <div class="upload-icon"><span class="material-icons-round">cloud_upload</span></div>
@@ -250,7 +256,7 @@
   <div class="modal">
     <div class="drag-handle"></div>
     <div class="modal-head">
-      <div class="modal-title" id="authTitle">Sign in to Skoop</div>
+      <div class="modal-title" id="authTitle">Sign in to your Skoop account</div>
       <button class="close-btn" onclick="closeOverlay('loginOverlay')"><span class="material-icons-round">close</span></button>
     </div>
     <div class="modal-body">
@@ -272,6 +278,9 @@
         <button class="btn btn-primary btn-full" style="margin-bottom:14px" onclick="handleLogin()">
           Sign In
         </button>
+        <p style="text-align:center;color:var(--ink3);font-size:0.85rem;margin:10px 0;">
+          <a href="#" style="color:var(--accent);text-decoration:none;font-weight:600;" onclick="switchToForgotPassword(event)">Forgot password?</a>
+        </p>
         <p style="text-align:center;color:var(--ink3);font-size:0.85rem">
           No account? <a href="#" style="color:var(--accent);text-decoration:none;font-weight:600" onclick="switchToSignup(event)">Create one</a>
         </p>
@@ -305,6 +314,20 @@
         </button>
         <p style="text-align:center;color:var(--ink3);font-size:0.85rem">
           Already have an account? <a href="#" style="color:var(--accent);text-decoration:none;font-weight:600" onclick="switchToLogin(event)">Sign in</a>
+        </p>
+      </div>
+
+      <!-- FORGOT PASSWORD FORM -->
+      <div id="forgotPasswordForm" style="display:none">
+        <div class="form-group">
+          <label>Email Address</label>
+          <input class="input" placeholder="you@university.edu.ng" type="email" id="resetEmail">
+        </div>
+        <button class="btn btn-primary btn-full" style="margin-bottom:14px" onclick="handleForgotPassword()">
+          Send Reset Link
+        </button>
+        <p style="text-align:center;color:var(--ink3);font-size:0.85rem">
+          Remember it? <a href="#" style="color:var(--accent);text-decoration:none;font-weight:600" onclick="switchToLogin(event)">Back to Sign In</a>
         </p>
       </div>
     </div>

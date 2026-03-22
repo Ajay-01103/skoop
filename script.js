@@ -126,6 +126,7 @@ function switchToSignup(e) {
   e.preventDefault();
   document.getElementById('loginForm').style.display = 'none';
   document.getElementById('signupForm').style.display = 'block';
+  document.getElementById('forgotPasswordForm').style.display = 'none';
   document.getElementById('authTitle').textContent = 'Create your Skoop account';
 }
 
@@ -133,7 +134,16 @@ function switchToLogin(e) {
   e.preventDefault();
   document.getElementById('loginForm').style.display = 'block';
   document.getElementById('signupForm').style.display = 'none';
+  document.getElementById('forgotPasswordForm').style.display = 'none';
   document.getElementById('authTitle').textContent = 'Sign in to Skoop';
+}
+
+function switchToForgotPassword(e) {
+  e.preventDefault();
+  document.getElementById('loginForm').style.display = 'none';
+  document.getElementById('signupForm').style.display = 'none';
+  document.getElementById('forgotPasswordForm').style.display = 'block';
+  document.getElementById('authTitle').textContent = 'Reset Your Password';
 }
 
 function togglePasswordVisibility(inputId, btn) {
@@ -146,6 +156,30 @@ function togglePasswordVisibility(inputId, btn) {
   } else {
     input.type = 'password';
     icon.textContent = 'visibility_off';
+  }
+}
+
+async function handleForgotPassword() {
+  const email = document.getElementById('resetEmail').value.trim();
+  
+  if (!email) {
+    showToast('warning', 'Please enter your email');
+    return;
+  }
+  
+  try {
+    await firebase.auth().sendPasswordResetEmail(email, {
+      url: 'https://thisisskoop.firebaseapp.com/Y/auth-redirect.html'
+    });
+    showToast('check_circle', 'Password reset link sent to your email');
+    document.getElementById('resetEmail').value = '';
+    setTimeout(() => switchToLogin({preventDefault: () => {}}), 2000);
+  } catch (error) {
+    if (error.code === 'auth/user-not-found') {
+      showToast('error', 'No account found with that email');
+    } else {
+      showToast('error', error.message);
+    }
   }
 }
 
@@ -188,6 +222,11 @@ async function handleSignup() {
   try {
     const result = await firebase.auth().createUserWithEmailAndPassword(email, password);
     
+    // Send verification email
+    await result.user.sendEmailVerification({
+      url: 'https://thisisskoop.firebaseapp.com/Y/auth-redirect.html'
+    });
+    
     // Save user data to Firestore
     await db.collection('users').doc(result.user.uid).set({
       uid: result.user.uid,
@@ -197,10 +236,11 @@ async function handleSignup() {
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       verifiedSeller: false,
       rating: 5,
-      sales: 0
+      sales: 0,
+      emailVerified: false
     });
     
-    showToast('check_circle', 'Account created! Welcome to Skoop');
+    showToast('check_circle', 'Account created! Check your email to verify and Welcome to Skoop!');
     closeOverlay('loginOverlay');
     document.getElementById('signupName').value = '';
     document.getElementById('signupEmail').value = '';
@@ -248,7 +288,7 @@ function showToast(icon, msg) {
 
 function handleLogout() {
   firebase.auth().signOut().then(() => {
-    showToast('check_circle', 'You sef don try, log in soon sha');
+    showToast('check_circle', 'Successfully Logged out');
     listings = [];
     renderListings();
   });
@@ -634,7 +674,7 @@ function openDetail(id) {
       ? `<img src="${l.img}" alt="Product image" style="width:100%;height:100%;object-fit:cover;border-radius:var(--radius)">`
       : `<span class="material-icons-round">${CAT_ICONS[l.cat]||'category'}</span>`;
     
-    const waLink = l.phone ? `https://wa.me/${l.phone.replace(/\D/g, '')}?text=Hi, interested in your ${encodeURIComponent(l.title)}` : null;
+    const waLink = l.phone ? `https://wa.me/${normalizePhoneNumber(l.phone)}?text=Hi, interested in your ${encodeURIComponent(l.title)}` : null;
     const isOwnListing = currentUser && currentUser.uid === l.sellerId;
     
     // Properly escape all user content for HTML
@@ -783,6 +823,7 @@ function postListing() {
   const cond     = document.getElementById('newCondition').value;
   const desc     = document.getElementById('newDesc').value.trim();
   const location = document.getElementById('newLocation').value.trim();
+  const negotiable = document.getElementById('newNegotiable').value === 'yes';
 
   if (!title || !price || !location) { showToast('warning','Please fill in all required fields'); return; }
   
@@ -826,6 +867,7 @@ function postListing() {
         desc: desc || 'No description provided.',
         phone: userPhone || null,
         location: location,
+        negotiable: negotiable,
         img: imgData,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         views: 0,
@@ -840,6 +882,7 @@ function postListing() {
       document.getElementById('newCondition').value = 'Brand New';
       document.getElementById('newCat').value = 'Electronics';
       document.getElementById('newLocation').value = 'On Campus';
+      document.getElementById('newNegotiable').value = 'yes';
       document.getElementById('fileInput').value = '';
       document.getElementById('uploadZone').style.display = 'block';
       document.getElementById('imagePreview').style.display = 'none';
@@ -936,6 +979,7 @@ function renderSavedItems() {
 
 // ── MESSAGING ──
 let currentChatId = null;
+let currentOtherUserName = null;
 let messagesUnsubscribe = null;
 
 // ── AUTH STATE ──
@@ -1034,7 +1078,7 @@ async function loadAndShowMessages() {
         </div>
       `;
     } else {
-      const conversationsHtml = querySnapshot.docs.map(doc => {
+      const conversationsHtml = await Promise.all(querySnapshot.docs.map(async doc => {
         const conv = doc.data();
         const otherUserId = conv.participants.find(pid => pid !== currentUser.uid);
         const time = conv.lastMessageTime ? new Date(conv.lastMessageTime.toDate()).toLocaleString() : '';
@@ -1045,14 +1089,25 @@ async function loadAndShowMessages() {
         const unreadFontWeight = isUnread ? '600' : '500';
         const unreadBackground = isUnread ? 'rgba(127, 61, 255, 0.1)' : 'transparent';
         
+        // Fetch the other user's actual name
+        let otherUserName = 'User';
+        try {
+          const otherUserDoc = await db.collection('users').doc(otherUserId).get();
+          if (otherUserDoc.exists && otherUserDoc.data().name) {
+            otherUserName = otherUserDoc.data().name;
+          }
+        } catch (err) {
+          console.log('Could not fetch other user name:', err);
+        }
+        
         return `
           <div style="
             padding:12px; background:${unreadBackground}; border-radius:var(--radius-sm);
             border:1px solid var(--border); cursor:pointer; transition:all 0.2s;
-          " onclick="openChatFromConversation('${doc.id}', '${otherUserId}', '${conv.sellerName || 'User'}')">
+          " onclick="openChatFromConversation('${doc.id}', '${otherUserId}', '${otherUserName.replace(/'/g, "\\'")}')">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
               <div style="display:flex; align-items:center; gap:8px; flex:1;">
-                <div style="font-weight:${unreadFontWeight}; color:var(--ink);">${conv.sellerName || 'User'}</div>
+                <div style="font-weight:${unreadFontWeight}; color:var(--ink);">${otherUserName}</div>
                 ${isUnread ? '<span style="width:8px; height:8px; background:var(--accent); border-radius:50%; flex-shrink:0;"></span>' : ''}
               </div>
               <div style="font-size:0.75rem; color:var(--ink3);">${time}</div>
@@ -1060,7 +1115,7 @@ async function loadAndShowMessages() {
             <div style="font-size:0.9rem; color:var(--ink2); font-weight:${isUnread ? '500' : '400'};">${preview}</div>
           </div>
         `;
-      }).join('');
+      })).then(html => html.join(''));
       
       container.innerHTML = conversationsHtml;
     }
@@ -1074,6 +1129,7 @@ async function loadAndShowMessages() {
 
 function openChatFromConversation(chatId, otherUserId, sellerName) {
   currentChatId = chatId;
+  currentOtherUserName = sellerName || 'User';
   document.getElementById('chatTitle').textContent = `Chat with ${sellerName || 'User'}`;
   
   // Mark conversation as read for current user
@@ -1370,6 +1426,116 @@ function generateConversationId(userId1, userId2) {
   return [userId1, userId2].sort().join('_');
 }
 
+// Phone number normalization for WhatsApp links
+function normalizePhoneNumber(phone) {
+  if (!phone) return '';
+  
+  // Remove all non-digit characters
+  let cleaned = phone.replace(/\D/g, '');
+  
+  // Handle Nigerian numbers - normalize to 234xxxxxxxxxx format
+  // If it starts with 0 (local format 080x), replace with 234
+  if (cleaned.startsWith('0')) {
+    cleaned = '234' + cleaned.substring(1);
+  }
+  // If it doesn't start with 234 and is 11 digits (local), assume it's 0xxxx and convert
+  else if (!cleaned.startsWith('234') && cleaned.length === 11) {
+    cleaned = '234' + cleaned.substring(1);
+  }
+  // Make sure it starts with 234 for Nigerian numbers
+  else if (!cleaned.startsWith('234') && cleaned.length === 10) {
+    cleaned = '234' + cleaned;
+  }
+  // If already has country code in other formats like 2348... ensure it's 234
+  else if (!cleaned.startsWith('234')) {
+    // Assume it's just the digits without country code
+    cleaned = '234' + cleaned;
+  }
+  
+  return cleaned;
+}
+
+// Migration: Add sender names to old messages that don't have them
+async function migrateMessagesToAddSenderNames() {
+  // Check if already migrated
+  if (localStorage.getItem('messageMigrationComplete')) {
+    return;
+  }
+  
+  if (!currentUser) return;
+  
+  console.log('Starting message migration to add sender names...');
+  
+  try {
+    // Get all conversations for current user
+    const conversationsSnapshot = await db.collection('conversations')
+      .where('participants', 'array-contains', currentUser.uid)
+      .get();
+    
+    console.log(`Found ${conversationsSnapshot.docs.length} conversations`);
+    
+    let totalMessagesUpdated = 0;
+    
+    // Process each conversation
+    for (const convDoc of conversationsSnapshot.docs) {
+      const conv = convDoc.data();
+      const conversationId = convDoc.id;
+      
+      // Get all messages in this conversation
+      const messagesSnapshot = await db.collection('conversations')
+        .doc(conversationId)
+        .collection('messages')
+        .get();
+      
+      console.log(`Processing conversation ${conversationId} with ${messagesSnapshot.docs.length} messages`);
+      
+      // Update messages that don't have senderName
+      for (const msgDoc of messagesSnapshot.docs) {
+        const msg = msgDoc.data();
+        
+        // Skip if already has senderName
+        if (msg.senderName) {
+          continue;
+        }
+        
+        // Get sender's name from users collection
+        try {
+          const senderDoc = await db.collection('users').doc(msg.senderId).get();
+          let senderName = msg.senderId;
+          
+          if (senderDoc.exists && senderDoc.data().name) {
+            senderName = senderDoc.data().name;
+          } else {
+            // Fallback to email prefix if name not found
+            const auth = firebase.auth();
+            if (auth.currentUser && auth.currentUser.uid === msg.senderId) {
+              senderName = auth.currentUser.email.split('@')[0];
+            }
+          }
+          
+          // Update message with sender name
+          await db.collection('conversations')
+            .doc(conversationId)
+            .collection('messages')
+            .doc(msgDoc.id)
+            .update({ senderName: senderName });
+          
+          totalMessagesUpdated++;
+          console.log(`Updated message ${msgDoc.id} with sender name: ${senderName}`);
+        } catch (err) {
+          console.error(`Error updating message ${msgDoc.id}:`, err);
+        }
+      }
+    }
+    
+    console.log(`Migration complete! Updated ${totalMessagesUpdated} messages`);
+    localStorage.setItem('messageMigrationComplete', 'true');
+    localStorage.setItem('messageMigrationDate', new Date().toISOString());
+  } catch (error) {
+    console.error('Message migration error:', error);
+  }
+}
+
 async function openChat(listingId, sellerId, sellerName) {
   try {
     if (!currentUser) {
@@ -1385,6 +1551,7 @@ async function openChat(listingId, sellerId, sellerName) {
     }
     
     currentChatId = generateConversationId(currentUser.uid, sellerId);
+    currentOtherUserName = sellerName || 'Seller';
     document.getElementById('chatTitle').textContent = `Chat with ${sellerName || 'Seller'}`;
     
     // Create/update conversation metadata with proper write permissions
@@ -1474,7 +1641,7 @@ function renderMessages(docs) {
     try {
       const msg = doc.data();
       const isMine = msg.senderId === currentUser.uid;
-      const senderName = isMine ? 'You' : 'Them';
+      const senderName = isMine ? 'You' : (msg.senderName || currentOtherUserName || 'Them');
       const time = msg.createdAt ? new Date(msg.createdAt.toDate()).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
       const textContent = (msg.text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
       const bgColor = isMine ? 'var(--accent)' : 'var(--bg2)';
@@ -1520,10 +1687,22 @@ async function sendMessage() {
     const conv = convDoc.data();
     const otherUserId = conv.participants.find(pid => pid !== currentUser.uid);
     
-    // Add message
+    // Get sender's name from user profile
+    let senderName = currentUser.email.split('@')[0];
+    try {
+      const userDoc = await db.collection('users').doc(currentUser.uid).get();
+      if (userDoc.exists && userDoc.data().name) {
+        senderName = userDoc.data().name;
+      }
+    } catch (err) {
+      console.log('Could not fetch user name, using email prefix');
+    }
+    
+    // Add message with sender name
     await db.collection('conversations').doc(currentChatId)
       .collection('messages').add({
         senderId: currentUser.uid,
+        senderName: senderName,
         text: text,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
@@ -1557,7 +1736,7 @@ async function loadSellerVerification(sellerId) {
     const userDoc = await db.collection('users').doc(sellerId).get();
     const verificationBadge = document.getElementById('sellerVerificationBadge');
     if (verificationBadge) {
-      if (userDoc.exists && userDoc.data().verifiedSeller) {
+      if (userDoc.exists && userDoc.data().verifiedSeller && userDoc.data().emailVerified) {
         verificationBadge.innerHTML = '<span class="material-icons-round" style="color:#2a6b3d;">verified</span>Verified student';
       } else {
         verificationBadge.innerHTML = '<span class="material-icons-round" style="color:var(--ink3);">person</span>Student';
@@ -1633,6 +1812,7 @@ firebase.auth().onAuthStateChanged(user => {
   if (user) {
     loadUserListings();
     updateUnreadBadge();  // Show unread message badge when logged in
+    migrateMessagesToAddSenderNames();  // Migrate old messages to add sender names (one-time)
   } else {
     document.getElementById('msgBadge').style.display = 'none';  // Hide badge when logged out
     if (unreadCountListener) unreadCountListener();  // Stop listening
